@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.2.0...pi-browser-use-v0.3.0) (2026-09-05)
+
+
+### Features
+
+* recovery retry, saved artifacts, and operator skills ([5a04194](https://github.com/0xPlayerOne/pi-browser-use/commit/5a041945851f57091d7da7dcc23d0d6a94cebab2))
+
+
+### Documentation
+
+* document artifacts, recovery, and bundled skills ([129d521](https://github.com/0xPlayerOne/pi-browser-use/commit/129d5212ac9661bb563ea131fe68c76a0102145c))
+
 ## [0.2.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.1.0...pi-browser-use-v0.2.0) (2026-09-05)
 
 
