@@ -46,6 +46,24 @@ Hosts where `process.execPath` is not a directly executable Node runtime can set
 
 Call `browser_list_pages` first, then pass its numeric `pageId` to page-scoped tools. See `skills/browser-policy/SKILL.md` for the full agent policy.
 
+## Vision model (optional)
+
+Enable `browser_analyze_screenshot` by referencing a model already configured in Pi's model registry. The extension resolves credentials from the registry automatically:
+
+```json
+{
+  "pi-browser-use": {
+    "visionModel": { "provider": "openai", "model": "gpt-4o" }
+  }
+}
+```
+
+Use it for canvas/WebGL scenes or coordinate clicks the accessibility tree cannot describe. Without `visionModel` the tool is not registered.
+
+## Browser profile
+
+On startup the default persistent profile is checked for accessibility. A root-owned or unreadable default (typically from running under `sudo`) is moved aside to `~/.pi/browser-profile.inaccessible-<timestamp>` so Chrome starts fresh instead of showing a preferences dialog. An explicit custom `userDataDir` in the same state fails fast with an ownership remediation hint. Never run the agent (or anything launching this browser) via `sudo`.
+
 ## License
 
 MIT

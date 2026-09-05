@@ -55,7 +55,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build",
-    "test": "node --test test/config.test.mjs",
+    "test": "node --test test/*.test.mjs",
     "pretest": "npm run build"
   },
   "dependencies": {
@@ -64,9 +64,11 @@
     "typebox": "*"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.80.10"
+    "@earendil-works/pi-coding-agent": ">=0.80.10",
+    "@earendil-works/pi-ai": ">=0.80.10"
   },
   "devDependencies": {
+    "@earendil-works/pi-ai": "0.85.1",
     "@types/node": "^22.0.0",
     "prettier": "^3.9.6",
     "typescript": "^5.9.0"

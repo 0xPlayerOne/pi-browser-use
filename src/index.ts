@@ -7,6 +7,12 @@ import {
   extractTextContent,
   postProcessToolResult,
 } from './tool-augment.js'
+import { prepareBrowserProfile } from './profile.js'
+import {
+  createRegistryVisionCaller,
+  handleAnalyzeScreenshot,
+  type VisionModelConfig,
+} from './vision.js'
 
 export { configToArgs, resolveConfig } from './config.js'
 
@@ -28,8 +34,17 @@ const EXCLUDED_TOOLS = new Set([
   'uninstall_extension',
 ])
 
+interface ModelRegistry {
+  find(provider: string, modelId: string): unknown
+  getApiKeyAndHeaders(
+    model: unknown
+  ): Promise<
+    { ok: true; apiKey?: string; headers?: Record<string, string> } | { ok: false; error: string }
+  >
+}
+
 interface PiToolContext {
-  modelRegistry?: unknown
+  modelRegistry?: ModelRegistry
 }
 
 interface Pi {
@@ -127,10 +142,53 @@ export default function browserUseExtension(pi: Pi) {
     }
   }
 
+  async function registerVisionTool(visionConfig: VisionModelConfig) {
+    const properties: Record<string, TSchema> = {
+      instruction: Type.Optional(
+        Type.String({
+          description:
+            'What to identify or analyze visually (e.g. "Find the coordinates of the blue submit button").',
+        })
+      ),
+    }
+    if (config?.experimentalPageIdRouting === true) {
+      properties.pageId = Type.Number({
+        description: 'Numeric page ID returned by browser_list_pages.',
+      })
+    }
+    pi.registerTool({
+      name: `${TOOL_PREFIX}analyze_screenshot`,
+      label: `${TOOL_PREFIX}analyze_screenshot`,
+      description:
+        'Analyze the current page visually using a screenshot. Use when you need to identify elements by visual attributes (color, layout, position) not available in the accessibility tree, or when you need precise pixel coordinates for coordinate click tools.',
+      parameters: Type.Object(properties),
+      async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+        await ensureConnected(signal)
+        if (!ctx?.modelRegistry)
+          throw new Error('Vision model registry is unavailable in this session.')
+        const callVision = createRegistryVisionCaller(visionConfig, ctx.modelRegistry)
+        const pageId = typeof params.pageId === 'number' ? params.pageId : undefined
+        const result = await handleAnalyzeScreenshot(
+          {
+            callTool: (name, args, sig) => client!.callTool(name, args, sig),
+          },
+          callVision,
+          { instruction: typeof params.instruction === 'string' ? params.instruction : '', pageId },
+          signal
+        )
+        return { ...result, details: undefined }
+      },
+    })
+  }
+
   pi.on('session_start', async (_event, ctx) => {
     config = resolveConfig(loadConfig({ cwd: ctx.cwd, projectTrusted: isProjectTrusted(ctx) }))
+    prepareBrowserProfile(config)
     client = new DevToolsClient(config)
     await registerUpstreamTools()
+    if (config.visionModel) {
+      await registerVisionTool(config.visionModel)
+    }
   })
 
   pi.on('session_shutdown', async () => {

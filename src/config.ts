@@ -5,6 +5,12 @@ export const DEFAULT_PROFILE_DIR = join(homedir(), '.pi', 'browser-profile')
 
 export type BrowserSessionMode = 'persistent' | 'isolated' | 'existing'
 
+/** Vision model used by the optional analyze_screenshot tool. Must already exist in Pi's model registry. */
+export interface VisionModelConfig {
+  provider: string
+  model: string
+}
+
 /** Configuration for the chrome-devtools-mcp subprocess. Same settings key as before: "pi-browser-use". */
 export interface BrowserUseConfig {
   sessionMode?: BrowserSessionMode
@@ -26,6 +32,7 @@ export interface BrowserUseConfig {
   experimentalScreencast?: boolean
   experimentalMemory?: boolean
   experimentalPageIdRouting?: boolean
+  visionModel?: VisionModelConfig
   usageStatistics?: boolean
   performanceCrux?: boolean
   redactNetworkHeaders?: boolean
