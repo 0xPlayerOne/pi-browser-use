@@ -44,7 +44,18 @@ Hosts where `process.execPath` is not a directly executable Node runtime can set
 
 ## Page-scoped tools
 
-Call `browser_list_pages` first, then pass its numeric `pageId` to page-scoped tools. See `skills/browser-policy/SKILL.md` for the full agent policy.
+Call `browser_list_pages` first, then pass its numeric `pageId` to page-scoped tools. Click-family calls blocked by an overlay are retried once automatically after dismissing it with Escape. See `skills/browser-policy/SKILL.md` for the full agent policy.
+
+## Saved artifacts
+
+`browser_save_artifact` writes a screenshot or the rendered HTML to disk (default `~/.pi/browser-artifacts/`) and returns the path. Prefer it over inline captures for evidence, visual QA, and artifact sharing.
+
+## Bundled skills
+
+- `browser-policy` — CLI-first decision order, session modes, bot-wall and safety rules.
+- `playwright-handoff` — when to stop clicking and run a repo Playwright spec instead (npm-first, bun alternatives, no repo changes required).
+- `triage-console` — snapshot → console errors → failed network → screenshot.
+- `visual-qa` — viewport matrix and canvas/WebGL discipline.
 
 ## Vision model (optional)
 
