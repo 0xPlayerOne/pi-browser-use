@@ -1,3 +1,6 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { Type, type TSchema } from 'typebox'
 import { DevToolsClient } from './client.js'
 import { resolveConfig, type BrowserUseConfig } from './config.js'
@@ -5,8 +8,11 @@ import { isProjectTrusted, loadConfig } from './settings.js'
 import {
   augmentToolDescription,
   extractTextContent,
+  looksOverlayBlocked,
+  OVERLAY_RECOVERABLE,
   postProcessToolResult,
 } from './tool-augment.js'
+import { pickImageData, resolveArtifactTarget, type ArtifactKind } from './artifacts.js'
 import { prepareBrowserProfile } from './profile.js'
 import {
   createRegistryVisionCaller,
@@ -18,6 +24,20 @@ export { configToArgs, resolveConfig } from './config.js'
 
 // All upstream tools are re-exported with this prefix to avoid name collisions.
 const TOOL_PREFIX = 'browser_'
+
+type UpstreamResult = {
+  content?: Array<{ type: string; text?: string; data?: string; mimeType?: string }>
+  isError?: boolean
+}
+
+async function callUpstream(
+  client: DevToolsClient,
+  name: string,
+  params: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<UpstreamResult> {
+  return (await client.callTool(name, params, signal)) as UpstreamResult
+}
 
 // Noisy, slow, or privileged upstream tools; skipped during registration.
 const EXCLUDED_TOOLS = new Set([
@@ -132,14 +152,95 @@ export default function browserUseExtension(pi: Pi) {
         parameters: Type.Unsafe(tool.inputSchema as TSchema),
         async execute(_toolCallId, params, signal) {
           await ensureConnected(signal)
-          const result = (await client!.callTool(originalName, params, signal)) as {
-            content?: Array<{ type: string; text?: string; data?: string; mimeType?: string }>
-            isError?: boolean
+          const browser = client!
+          let result = await callUpstream(browser, originalName, params, signal)
+          if (
+            result.isError &&
+            OVERLAY_RECOVERABLE.has(originalName) &&
+            looksOverlayBlocked(extractTextContent(result.content))
+          ) {
+            // One recovery attempt: dismiss the overlay, then retry the
+            // original call. Any failure here falls through to the
+            // original error, which already carries a hint.
+            try {
+              const escapeArgs =
+                typeof params.pageId === 'number'
+                  ? { pageId: params.pageId, key: 'Escape' }
+                  : { key: 'Escape' }
+              await callUpstream(browser, 'press_key', escapeArgs, signal)
+              result = await callUpstream(browser, originalName, params, signal)
+            } catch {
+              // Fall through to the original result below.
+            }
           }
           return { ...toToolContent(result, originalName), details: undefined }
         },
       })
     }
+  }
+
+  function registerSaveArtifactTool() {
+    const properties: Record<string, TSchema> = {
+      kind: Type.Union([Type.Literal('screenshot'), Type.Literal('html')], {
+        description: 'Capture a viewport screenshot (PNG) or the full rendered HTML.',
+      }),
+      path: Type.Optional(
+        Type.String({
+          description:
+            'Absolute destination path. Defaults to ~/.pi/browser-artifacts/<timestamp>.<png|html>.',
+        })
+      ),
+    }
+    if (config?.experimentalPageIdRouting === true) {
+      properties.pageId = Type.Number({
+        description: 'Numeric page ID returned by browser_list_pages.',
+      })
+    }
+    pi.registerTool({
+      name: `${TOOL_PREFIX}save_artifact`,
+      label: `${TOOL_PREFIX}save_artifact`,
+      description:
+        'Save a screenshot or the rendered HTML of the current page to disk and return its path. Prefer this over pulling image bytes into context when the capture is evidence (bug reports, visual QA, artifact sharing) rather than something you need to look at right now.',
+      parameters: Type.Object(properties),
+      async execute(_toolCallId, params, signal) {
+        await ensureConnected(signal)
+        const browser = client!
+        const kind: ArtifactKind = params.kind === 'html' ? 'html' : 'screenshot'
+        const pageId = typeof params.pageId === 'number' ? params.pageId : undefined
+        const target = resolveArtifactTarget(kind, params.path)
+        if (kind === 'html') {
+          const pageArgs = pageId === undefined ? {} : { pageId }
+          const evaluated = (await browser.callTool(
+            'evaluate_script',
+            {
+              ...pageArgs,
+              function: '() => document.documentElement.outerHTML',
+            },
+            signal
+          )) as UpstreamResult
+          const html = extractTextContent(evaluated.content)
+          if (!html) throw new Error('Page HTML came back empty.')
+          mkdirSync(dirname(target), { recursive: true })
+          writeFileSync(target, html, 'utf8')
+          return {
+            content: [
+              { type: 'text', text: `Saved page HTML (${html.length} chars) to ${target}` },
+            ],
+            details: undefined,
+          }
+        }
+        const shotArgs = pageId === undefined ? {} : { pageId }
+        const shot = (await browser.callTool('take_screenshot', shotArgs, signal)) as UpstreamResult
+        const image = pickImageData(shot.content)
+        if (!image) throw new Error('Screenshot came back without image data.')
+        mkdirSync(dirname(target), { recursive: true })
+        writeFileSync(target, Buffer.from(image.data, 'base64'))
+        return {
+          content: [{ type: 'text', text: `Saved screenshot to ${target}` }],
+          details: undefined,
+        }
+      },
+    })
   }
 
   async function registerVisionTool(visionConfig: VisionModelConfig) {
@@ -186,6 +287,7 @@ export default function browserUseExtension(pi: Pi) {
     prepareBrowserProfile(config)
     client = new DevToolsClient(config)
     await registerUpstreamTools()
+    registerSaveArtifactTool()
     if (config.visionModel) {
       await registerVisionTool(config.visionModel)
     }

@@ -22,6 +22,23 @@ export function postProcessToolResult(originalName: string, text: string): strin
   return text
 }
 
+// Click-family tools worth one automatic recovery attempt when an overlay
+// blocks them: dismiss with Escape, then retry once.
+export const OVERLAY_RECOVERABLE = new Set([
+  'click',
+  'click_at',
+  'fill',
+  'fill_form',
+  'press_key',
+  'type_text',
+  'hover',
+  'drag',
+])
+
+export function looksOverlayBlocked(text: string): boolean {
+  return /overlay|obscured|intercept|behind another element|not clickable|not visible/i.test(text)
+}
+
 export function extractTextContent(content: unknown): string {
   if (!Array.isArray(content)) return ''
   return content
