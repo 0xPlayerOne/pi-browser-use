@@ -1,0 +1,74 @@
+{
+  "name": "pi-browser-use",
+  "version": "0.1.0",
+  "description": "Opinionated browser-use for the Pi coding agent, powered by chrome-devtools-mcp (not Playwright). Fresh headless by default, authenticated persistent profile opt-in, CLI-first policy bundled.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "browser",
+    "automation",
+    "chrome-devtools",
+    "mcp"
+  ],
+  "license": "MIT",
+  "author": "0xPlayerOne",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0xPlayerOne/pi-browser-use.git"
+  },
+  "homepage": "https://github.com/0xPlayerOne/pi-browser-use#readme",
+  "bugs": {
+    "url": "https://github.com/0xPlayerOne/pi-browser-use/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || ^22.12.0 || >=23"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": {
+      "default": "./package.json"
+    }
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run build",
+    "test": "node --test test/config.test.mjs",
+    "pretest": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "chrome-devtools-mcp": "1.8.0",
+    "typebox": "*"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.80.10"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.0"
+  }
+}
