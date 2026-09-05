@@ -43,6 +43,7 @@
       "section": "Maintenance"
     }
   ],
-  "release-type": "node",
-  "extra-files": []
+  "packages": {
+    ".": {}
+  }
 }
