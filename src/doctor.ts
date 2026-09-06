@@ -6,6 +6,10 @@ export interface DoctorReport {
   mode: string
   headless: boolean
   launchesChrome: boolean
+  /** Who owns the Chrome process: Pi self-launch, MCP launch, or user attach. */
+  backend?: 'pi-owned' | 'mcp-launched' | 'attached-external'
+  /** Tab-bridge base URL when the Existing broker bridge is running. */
+  bridgeUrl?: string | null
   profile: { dir: string | null; exists: boolean; writable: boolean }
   endpoint: string | null
   upstreamTools: number
@@ -31,7 +35,8 @@ function profileStatus(dir: string | null): { exists: boolean; writable: boolean
  */
 export async function diagnose(
   config: BrowserUseConfig,
-  listToolNames: () => Promise<string[]>
+  listToolNames: () => Promise<string[]>,
+  extra?: { backend?: DoctorReport['backend']; bridgeUrl?: string | null }
 ): Promise<DoctorReport> {
   const launchesChrome = !config.browserUrl && !config.wsEndpoint && !config.autoConnect
   const dir =
@@ -40,6 +45,14 @@ export async function diagnose(
     mode: config.sessionMode ?? 'isolated',
     headless: config.headless ?? true,
     launchesChrome,
+    backend:
+      extra?.backend ??
+      (config.browserUrl || config.wsEndpoint
+        ? 'attached-external'
+        : launchesChrome
+          ? 'mcp-launched'
+          : 'attached-external'),
+    bridgeUrl: extra?.bridgeUrl ?? null,
     profile: { dir, ...profileStatus(dir) },
     endpoint:
       config.browserUrl ?? config.wsEndpoint ?? (config.autoConnect ? 'auto-discovered' : null),
@@ -49,12 +62,16 @@ export async function diagnose(
 }
 
 export function formatDoctorReport(report: DoctorReport, home: string = homedir()): string {
-  const lines = [
-    `Mode: ${report.mode} (headless: ${report.headless ? 'yes' : 'no'})`,
-    report.launchesChrome
-      ? 'Chrome: launched by chrome-devtools-mcp for this session.'
-      : `Chrome: attached externally (${report.endpoint ?? 'unknown endpoint'}). Launch flags do not apply.`,
-  ]
+  const backendLine =
+    report.backend === 'pi-owned'
+      ? 'Chrome: Pi-owned process for this session (self-launched profile, MCP attached).'
+      : report.launchesChrome
+        ? 'Chrome: launched by chrome-devtools-mcp for this session.'
+        : `Chrome: attached externally (${report.endpoint ?? 'unknown endpoint'}). Launch flags do not apply.`
+  const lines = [`Mode: ${report.mode} (headless: ${report.headless ? 'yes' : 'no'})`, backendLine]
+  if (report.bridgeUrl) {
+    lines.push(`Tab bridge: ${report.bridgeUrl} (Existing-mode broker).`)
+  }
   if (report.profile.dir) {
     const display = report.profile.dir.replace(home, '~')
     lines.push(

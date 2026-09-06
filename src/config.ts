@@ -54,6 +54,8 @@ export interface BrowserUseConfig {
   allowedUrlPattern?: string[]
   blockedUrlPattern?: string[]
   slim?: boolean
+  /** Loopback port for the Existing-mode tab-broker bridge. Default 31973; set 0 to disable the bridge. */
+  tabBridgePort?: number
   /** First-class Chrome flags, forwarded as --chrome-arg=<flag>. Only applies when Chrome is launched by chrome-devtools-mcp (not with autoConnect/browserUrl). */
   chromeArgs?: string[]
   /** Raw escape hatch: extra CLI flags forwarded verbatim to chrome-devtools-mcp. */
@@ -84,7 +86,7 @@ const DEFAULTS: BrowserUseConfig = {
 }
 
 /** In-session backend target for browser_switch_mode. */
-export type BrowserMode = 'fresh' | 'persistent'
+export type BrowserMode = 'fresh' | 'persistent' | 'existing'
 
 /**
  * Build the config for a mode switch from the session base config.
@@ -114,6 +116,15 @@ export function resolveModeTarget(
     const { userDataDir: _userDataDir, ...freshRest } = rest
     void _userDataDir
     return { ...freshRest, sessionMode: 'isolated', headless: !headed, isolated: true }
+  }
+  if (mode === 'existing') {
+    // Attach to the user's running Chrome: drop Pi-owned launch fields so
+    // MCP auto-connects instead of starting its own browser.
+    const { userDataDir: _userDataDir, isolated: _isolated, ...existingRest } = rest
+    void _userDataDir
+    void _isolated
+    // Existing attaches to the user's visible Chrome: always headed.
+    return { ...existingRest, sessionMode: 'existing', headless: false, autoConnect: true }
   }
   return {
     ...rest,
