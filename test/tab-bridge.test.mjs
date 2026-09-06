@@ -160,7 +160,10 @@ describe('parseMcpPageList', () => {
         },
       ],
     }
-    assert.deepEqual(parseMcpPageList(result), [{ pageId: 1 }, { pageId: 7 }])
+    assert.deepEqual(parseMcpPageList(result), [
+      { pageId: 1, title: 'New Tab (chrome://new-tab-page/)' },
+      { pageId: 7, title: 'Example Domain', url: 'https://example.com/' },
+    ])
   })
 
   it('prefers structured content and never throws on junk', async () => {
@@ -171,6 +174,29 @@ describe('parseMcpPageList', () => {
     )
     assert.deepEqual(parseMcpPageList(null), [])
     assert.deepEqual(parseMcpPageList({ content: [{ type: 'text', text: 'no pages here' }] }), [])
+  })
+})
+
+describe('checkExistingCloseAllowed', () => {
+  it('allows Pi-owned tab URLs and refuses user tabs', async () => {
+    const { checkExistingCloseAllowed } = await import('../dist/existing-flow.js')
+    const entries = [
+      { pageId: 1, title: 'npm', url: 'https://www.npmjs.com/org/adea-ai' },
+      { pageId: 7, title: 'Example Domain', url: 'https://example.com/' },
+    ]
+    assert.deepEqual(checkExistingCloseAllowed(entries, 7, new Set(['https://example.com/'])), {
+      ok: true,
+    })
+    const refused = checkExistingCloseAllowed(entries, 1, new Set(['https://example.com/']))
+    assert.equal(refused.ok, false)
+    assert.match(refused.reason, /Refusing to close/)
+  })
+
+  it('fails safe on stale ids and URL-less entries', async () => {
+    const { checkExistingCloseAllowed } = await import('../dist/existing-flow.js')
+    const entries = [{ pageId: 1, title: 'New Tab' }]
+    assert.equal(checkExistingCloseAllowed(entries, 9, new Set()).ok, false)
+    assert.equal(checkExistingCloseAllowed(entries, 1, new Set()).ok, false)
   })
 })
 

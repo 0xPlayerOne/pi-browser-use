@@ -21,6 +21,38 @@ import { TabBridge } from './tab-bridge.js'
 export interface McpPageEntry {
   pageId: number
   url?: string
+  title?: string
+}
+
+/** URLs Pi opened or navigated to in Existing mode: the only close targets. */
+export function normalizeTabUrl(url: string): string {
+  return url.endsWith('/') && url.length > 1 ? url.slice(0, -1) : url
+}
+
+/** Refuse to close Existing-mode tabs Pi did not open (spec 19). */
+export function checkExistingCloseAllowed(
+  entries: McpPageEntry[],
+  pageId: number,
+  piOwnedUrls: ReadonlySet<string>
+): { ok: true } | { ok: false; reason: string } {
+  const target = entries.find((entry) => entry.pageId === pageId)
+  if (!target) {
+    return {
+      ok: false,
+      reason: `No page ${pageId} is currently open. Re-list pages; page IDs shift when tabs close.`,
+    }
+  }
+  const url = target.url ?? ''
+  if (url !== '' && (piOwnedUrls.has(url) || piOwnedUrls.has(normalizeTabUrl(url)))) {
+    return { ok: true }
+  }
+  return {
+    ok: false,
+    reason:
+      `Refusing to close page ${pageId} (${target.title ?? url ?? 'unknown tab'}): ` +
+      `Pi did not open it, and closing unrelated user tabs is forbidden. ` +
+      `Pass force:true only if the user explicitly asked for this exact tab.`,
+  }
 }
 
 export interface ExistingFlowDeps {
@@ -76,8 +108,15 @@ export function parseMcpPageList(result: unknown): McpPageEntry[] {
         .join('\n')
     : ''
   for (const line of text.split('\n')) {
-    const match = line.match(/^\s*(\d+)\s*:/)
-    if (match) entries.push({ pageId: Number(match[1]) })
+    const match = line.match(/^\s*(\d+)\s*:(.*?)(?:\((https?:[^)]*)\))?\s*(?:\[selected\])?\s*$/)
+    if (match) {
+      const entry: McpPageEntry = { pageId: Number(match[1]) }
+      const title = (match[2] ?? '').trim()
+      if (title) entry.title = title
+      const url = (match[3] ?? '').trim()
+      if (url) entry.url = url
+      entries.push(entry)
+    }
   }
   return entries
 }

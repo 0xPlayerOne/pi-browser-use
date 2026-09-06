@@ -28,7 +28,12 @@ import {
   parseAnnotatedElements,
 } from './annotate.js'
 import { diagnose, formatDoctorReport } from './doctor.js'
-import { openExistingPage, parseMcpPageList } from './existing-flow.js'
+import {
+  checkExistingCloseAllowed,
+  normalizeTabUrl,
+  openExistingPage,
+  parseMcpPageList,
+} from './existing-flow.js'
 import { applyNewPageDefaults, applySelectPageDefaults } from './focus-policy.js'
 import { PersistentBackend, shouldSelfLaunch } from './persistent-backend.js'
 import {
@@ -169,6 +174,14 @@ export default function browserUseExtension(pi: Pi) {
   let bridge: TabBridge | undefined
   // Last navigated origin: drives the per-origin headed-background fallback.
   let lastOrigin: string | undefined
+  // URLs Pi opened or navigated to in Existing mode (raw + normalized): the
+  // only close_page targets allowed there without explicit force:true.
+  const piOwnedUrls = new Set<string>()
+
+  function trackPiUrl(url: string) {
+    piOwnedUrls.add(url)
+    piOwnedUrls.add(normalizeTabUrl(url))
+  }
   // Tracks which identity the live backend holds, so results can suggest
   // escalation. 'custom' covers user-configured attach setups we did not pick.
   let currentMode: 'fresh' | 'persistent' | 'existing' | 'custom' = 'fresh'
@@ -352,11 +365,28 @@ export default function browserUseExtension(pi: Pi) {
       const prefixedName = `${TOOL_PREFIX}${tool.name}`
       const originalName = tool.name
       const description = augmentToolDescription(prefixedName, tool.description ?? '')
+      // close_page carries an extra force gate so Existing mode can refuse
+      // to close tabs Pi did not open (spec 19); stripped before upstream.
+      const parameters =
+        originalName === 'close_page'
+          ? Type.Object({
+              pageId: Type.Number({
+                description:
+                  'The ID of the page to close. Call browser_list_pages first; IDs shift when tabs close.',
+              }),
+              force: Type.Optional(
+                Type.Boolean({
+                  description:
+                    'Existing mode only: Pi refuses to close tabs it did not open unless force is true and the user explicitly asked for that exact tab.',
+                })
+              ),
+            })
+          : Type.Unsafe(tool.inputSchema as TSchema)
       pi.registerTool({
         name: prefixedName,
         label: prefixedName,
         description,
-        parameters: Type.Unsafe(tool.inputSchema as TSchema),
+        parameters,
         async execute(_toolCallId, params, signal) {
           await ensureConnected(signal)
           const browser = client!
@@ -376,6 +406,41 @@ export default function browserUseExtension(pi: Pi) {
             // Remember the origin for the per-origin headed-background
             // fallback; normalizeOrigin never throws (falls back to raw).
             lastOrigin = normalizeOrigin(effectiveParams.url)
+            // In Existing mode a Pi-driven navigation marks the destination
+            // as Pi-touched for the close guard below.
+            if (currentMode === 'existing') trackPiUrl(effectiveParams.url)
+          }
+          // Existing mode never closes user tabs: close_page carries a
+          // force gate and a Pi-ownership check (spec 19).
+          if (originalName === 'close_page') {
+            const { force: _force, ...closeArgs } = effectiveParams
+            void _force
+            if (currentMode === 'existing' && effectiveParams.force !== true) {
+              if (typeof effectiveParams.pageId !== 'number') {
+                return {
+                  content: [{ type: 'text', text: 'close_page needs a numeric pageId.' }],
+                  isError: true as const,
+                  details: undefined,
+                }
+              }
+              const entries = parseMcpPageList(
+                await callUpstream(browser, 'list_pages', {}, signal)
+              )
+              const verdict = checkExistingCloseAllowed(
+                entries,
+                effectiveParams.pageId,
+                piOwnedUrls
+              )
+              if (!verdict.ok) {
+                return {
+                  content: [{ type: 'text', text: verdict.reason }],
+                  isError: true as const,
+                  details: undefined,
+                }
+              }
+            }
+            const result = await callUpstream(browser, originalName, closeArgs, signal)
+            return { ...toToolContent(result, originalName), details: undefined }
           }
           let result = await callUpstream(browser, originalName, effectiveParams, signal)
           if (
@@ -810,6 +875,7 @@ export default function browserUseExtension(pi: Pi) {
           },
           { timeoutMs, signal }
         )
+        trackPiUrl(params.url)
         const selectHint =
           result.pageId !== undefined
             ? ` Select it with browser_select_page (it stays in the background).`
