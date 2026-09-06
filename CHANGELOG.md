@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.4.0...pi-browser-use-v0.4.1) (2026-09-06)
+
+
+### Documentation
+
+* complete feature reference with annotated captures ([c889b19](https://github.com/0xPlayerOne/pi-browser-use/commit/c889b19adbeffd3c250cf7353dd2010782255874))
+
 ## [0.4.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.3.3...pi-browser-use-v0.4.0) (2026-09-06)
 
 
