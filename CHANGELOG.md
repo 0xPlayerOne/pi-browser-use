@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.4.4...pi-browser-use-v0.5.0) (2026-09-06)
+
+
+### Features
+
+* headed toggle for both browser modes ([319ea52](https://github.com/0xPlayerOne/pi-browser-use/commit/319ea52449dd2b5161e1ab5e6402cf7294034485))
+* in-session browser_switch_mode between fresh and auth profiles ([de01125](https://github.com/0xPlayerOne/pi-browser-use/commit/de01125757dd8be8d73ec8080d0e2fefd6a793c9))
+
 ## [0.4.4](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.4.3...pi-browser-use-v0.4.4) (2026-09-06)
 
 
