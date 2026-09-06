@@ -21,6 +21,31 @@ describe('overlay recovery matching', () => {
   })
 })
 
+describe('looksLikeLoginWall', () => {
+  it('matches login URLs', async () => {
+    const { looksLikeLoginWall } = await import('../dist/tool-augment.js')
+    assert.equal(looksLikeLoginWall('https://x.com/login', 'welcome'), true)
+    assert.equal(looksLikeLoginWall('https://x.com/auth/sso?x=1', 'welcome'), true)
+    assert.equal(looksLikeLoginWall('https://x.com/', 'welcome'), false)
+  })
+
+  it('needs two content signals without a login URL', async () => {
+    const { looksLikeLoginWall } = await import('../dist/tool-augment.js')
+    assert.equal(looksLikeLoginWall('https://x.com/', 'Sign in'), false)
+    assert.equal(
+      looksLikeLoginWall('https://x.com/', 'Verifying you are human. Just a moment.'),
+      true
+    )
+    assert.equal(
+      looksLikeLoginWall(
+        'https://x.com/',
+        'Log in to continue. Two-factor authentication required.'
+      ),
+      true
+    )
+  })
+})
+
 describe('artifacts', () => {
   it('resolves explicit paths verbatim', () => {
     assert.equal(resolveArtifactTarget('screenshot', '/tmp/x.png'), '/tmp/x.png')

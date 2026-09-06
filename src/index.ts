@@ -13,6 +13,7 @@ import { isProjectTrusted, loadConfig } from './settings.js'
 import {
   augmentToolDescription,
   extractTextContent,
+  looksLikeLoginWall,
   looksOverlayBlocked,
   OVERLAY_RECOVERABLE,
   postProcessToolResult,
@@ -143,6 +144,25 @@ function toToolContent(
 export default function browserUseExtension(pi: Pi) {
   let config: BrowserUseConfig | undefined
   let client: DevToolsClient | undefined
+  // Tracks which identity the live backend holds, so results can suggest
+  // escalation. 'custom' covers user-configured attach setups we did not pick.
+  let currentMode: 'fresh' | 'auth' | 'custom' = 'fresh'
+
+  function describeMode(): 'fresh' | 'auth' | 'custom' {
+    if (config?.sessionMode === 'isolated') return 'fresh'
+    if (config?.sessionMode === 'persistent') return 'auth'
+    return 'custom'
+  }
+
+  function loginWallHint(url: string | undefined, text: string): string {
+    if (currentMode !== 'fresh') return ''
+    if (!looksLikeLoginWall(url, text)) return ''
+    return '\n\nHint: this looks like a login wall in a fresh (logged-out) session. If the page needs your identity, call browser_switch_mode({"mode": "auth"}) — a human must complete any SSO, 2FA, or passkey step, ideally headed.'
+  }
+
+  function pageUrlFromSnapshot(text: string): string | undefined {
+    return text.match(/\burl="([^"]+)"/)?.[1]
+  }
 
   async function ensureConnected(signal?: AbortSignal) {
     if (!client) throw new Error('browser-use: session not started')
@@ -185,7 +205,22 @@ export default function browserUseExtension(pi: Pi) {
               // Fall through to the original result below.
             }
           }
-          return { ...toToolContent(result, originalName), details: undefined }
+          const toolContent = toToolContent(result, originalName)
+          if (
+            !toolContent.isError &&
+            (originalName === 'navigate_page' || originalName === 'take_snapshot')
+          ) {
+            const url =
+              originalName === 'navigate_page' && typeof params.url === 'string'
+                ? params.url
+                : pageUrlFromSnapshot(extractTextContent(result.content))
+            const hint = loginWallHint(url, extractTextContent(result.content))
+            const first = toolContent.content[0]
+            if (hint && first && first.text !== undefined) {
+              first.text += hint
+            }
+          }
+          return { ...toolContent, details: undefined }
         },
       })
     }
@@ -329,6 +364,7 @@ export default function browserUseExtension(pi: Pi) {
         client = new DevToolsClient(next)
         await client.ensureReady(signal)
         config = next
+        currentMode = mode
         return {
           content: [
             {
@@ -403,6 +439,7 @@ export default function browserUseExtension(pi: Pi) {
 
   pi.on('session_start', async (_event, ctx) => {
     config = resolveConfig(loadConfig({ cwd: ctx.cwd, projectTrusted: isProjectTrusted(ctx) }))
+    currentMode = describeMode()
     prepareBrowserProfile(config)
     client = new DevToolsClient(config)
     await registerUpstreamTools()

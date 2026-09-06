@@ -19,6 +19,7 @@ description: "Browser-use policy for Pi agents. Use before any browser_* tool ca
 - **Authenticated profile** (`sessionMode: persistent`). Log in once in `~/.pi/browser-profile`; cookies persist. Use when the task needs your identity (private repos, Cloudflare dashboard). Headed windows pop — warn the user before launching.
 - **Existing Chrome** (`sessionMode: existing` + `autoConnect`) is intrusive (drives the user's daily browser, sees all tabs). Avoid unless the user explicitly asks.
 - **Switch, don't restart**: `browser_switch_mode` moves between fresh and auth mid-session. Start fresh; escalate to auth on login walls; drop back to fresh for clean-room checks.
+- **Login walls are detected**: navigation and snapshot results in a fresh session name the wall and suggest the switch (a human still completes SSO/2FA).
 - **Visual analysis** (`browser_analyze_screenshot`, only when `visionModel` is configured) is for canvas/WebGL scenes and coordinate clicks the tree cannot describe — not a substitute for reading the snapshot first.
 
 `--chrome-arg` flags only apply when `chrome-devtools-mcp` launches Chrome itself — never with `autoConnect`/`browserUrl`. On macOS `--start-minimized` is ignored; only `headless: true` truly hides the window.

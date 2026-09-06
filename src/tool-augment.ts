@@ -39,6 +39,27 @@ export function looksOverlayBlocked(text: string): boolean {
   return /overlay|obscured|intercept|behind another element|not clickable|not visible/i.test(text)
 }
 
+const LOGIN_URL =
+  /(^|\/)(login|log-in|signin|sign-in|auth|authenticate|challenge|verify|2fa|totp|sso)(\/|$|[?#])/i
+const LOGIN_CONTENT = [
+  /verifying you are human/i,
+  /just a moment/i,
+  /cf-turnstile/i,
+  /log in to continue/i,
+  /sign in to continue/i,
+  /two-factor authentication/i,
+  /2-step verification/i,
+]
+
+/**
+ * Conservative login-wall detection: URL match, or at least two independent
+ * content signals (a lone "Sign in" link on a homepage must not trigger).
+ */
+export function looksLikeLoginWall(url: string | undefined, text: string): boolean {
+  if (url && LOGIN_URL.test(url)) return true
+  return LOGIN_CONTENT.filter((pattern) => pattern.test(text)).length >= 2
+}
+
 export function extractTextContent(content: unknown): string {
   if (!Array.isArray(content)) return ''
   return content
