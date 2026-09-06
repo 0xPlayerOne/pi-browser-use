@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.3.2...pi-browser-use-v0.3.3) (2026-09-06)
+
+
+### Documentation
+
+* cross-link Python and external-vision alternatives in skills ([6476b8f](https://github.com/0xPlayerOne/pi-browser-use/commit/6476b8ff198ec33c23b2d28b1b468efea686ba86))
+
 ## [0.3.2](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.3.1...pi-browser-use-v0.3.2) (2026-09-06)
 
 
