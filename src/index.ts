@@ -201,6 +201,9 @@ export default function browserUseExtension(pi: Pi) {
       if (currentMode === 'custom') {
         return '\n\nThis page needs an identity this session does not have. Sign in is required — complete it in the visible browser, then retry.'
       }
+      if (config?.headless === false) {
+        return '\n\nThis page needs a login and the browser is already visible. Sign in in that window, then retry — no relaunch, nothing closed.'
+      }
       return await escalateToHeaded(url ?? 'this page')
     }
     // Challenge (bot check): identity never helps; only a human-gated
