@@ -294,19 +294,49 @@ export default function browserUseExtension(pi: Pi) {
     return '\n\nHint: this looks like a login wall in a fresh (logged-out) session. If the page needs your identity, call browser_switch_mode({"mode": "persistent"}) — a human must complete any SSO, 2FA, or passkey step, ideally headed.'
   }
 
+  function sameOrigin(a: string | undefined, b: string | undefined): boolean {
+    try {
+      if (!a || !b) return false
+      return new URL(a).origin === new URL(b).origin
+    } catch {
+      return false
+    }
+  }
+
   /**
    * Automatic escalation for hard blocks the agent cannot clear alone.
    * Returns prompt text for the agent to relay, or empty when nothing
    * applies. Escalates at most once per call; never loops, never retries
    * a challenge page, and never switches away from an attached session.
+   *
+   * Challenges only escalate with navigation context: a stale "Just a
+   * moment..." shortcut tile on a New Tab snapshot must not rebuild the
+   * backend, and a challenge on another origin than requested means the
+   * navigation never landed there.
    */
   async function escalateBlockedPage(
     url: string | undefined,
     text: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    context?: { tool: string; requestedUrl?: string }
   ): Promise<string> {
     const state = classifyPageState(url, text)
     if (state === 'ok') return ''
+    if (state === 'challenge') {
+      if (context?.tool !== 'navigate_page') return ''
+      if (context.requestedUrl && url && !sameOrigin(context.requestedUrl, url)) {
+        // Challenge-provider handoffs (dedicated challenge domains) still
+        // count; anything else means the navigation never landed there.
+        const host = (() => {
+          try {
+            return new URL(url).hostname
+          } catch {
+            return ''
+          }
+        })()
+        if (!/challenge|turnstile|captcha|cf-chl|kasada|perimeterx|datadome/i.test(host)) return ''
+      }
+    }
     if (state === 'login-wall') {
       if (currentMode === 'fresh') return loginWallHint(url, text)
       if (currentMode === 'custom' || currentMode === 'existing') {
@@ -467,14 +497,19 @@ export default function browserUseExtension(pi: Pi) {
             !toolContent.isError &&
             (originalName === 'navigate_page' || originalName === 'take_snapshot')
           ) {
-            const url =
+            // Prefer the page's real URL from the snapshot; fall back to the
+            // requested URL only when the snapshot carries none.
+            const snapshotUrl = pageUrlFromSnapshot(extractTextContent(result.content))
+            const requestedUrl =
               originalName === 'navigate_page' && typeof effectiveParams.url === 'string'
                 ? effectiveParams.url
-                : pageUrlFromSnapshot(extractTextContent(result.content))
+                : undefined
+            const url = snapshotUrl ?? requestedUrl
             const escalation = await escalateBlockedPage(
               url,
               extractTextContent(result.content),
-              signal
+              signal,
+              { tool: originalName, requestedUrl }
             )
             const first = toolContent.content[0]
             if (escalation && first && first.text !== undefined) {
