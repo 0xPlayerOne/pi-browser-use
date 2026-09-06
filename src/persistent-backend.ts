@@ -23,7 +23,13 @@
  * unit-testable without a real Chrome.
  */
 
-import { launchChrome, type ChromeLaunchOptions, type ChromeProcess } from './chrome-launcher.js'
+import {
+  findManagedChromePids,
+  launchChrome,
+  type ChromeLaunchOptions,
+  type ChromeProcess,
+} from './chrome-launcher.js'
+import { execFileSync } from 'node:child_process'
 import { ensureNamedProfile, PI_PROFILE_NAME } from './named-profile.js'
 import { acquireProfileLock, ProfileLockedError, type ProfileLockHandle } from './profile-lock.js'
 import {
@@ -97,6 +103,49 @@ export class PersistentBackend {
   }
 
   /**
+   * Kill leftover Pi-managed Chromes on this profile (crashed sessions).
+   * Only processes carrying our managed flags; skips our own pid and
+   * manually opened windows. Injectable runner for tests.
+   */
+  protected reapOrphans(
+    profileDir: string,
+    runner?: { ps(): string; kill(pid: number): void }
+  ): number[] {
+    const run = runner ?? {
+      ps: () => {
+        try {
+          return execFileSync('ps', ['-eo', 'pid,command'], { encoding: 'utf8' })
+        } catch {
+          return ''
+        }
+      },
+      kill: (pid: number) => {
+        try {
+          process.kill(pid, 'SIGTERM')
+        } catch {
+          // Already gone; the endpoint check below confirms.
+        }
+      },
+    }
+    let targets: number[] = []
+    try {
+      targets = findManagedChromePids(run.ps(), profileDir, process.pid)
+    } catch {
+      return []
+    }
+    const reaped: number[] = []
+    for (const pid of targets) {
+      try {
+        run.kill(pid)
+        reaped.push(pid)
+      } catch {
+        // One stubborn process must not block the launch.
+      }
+    }
+    return reaped
+  }
+
+  /**
    * Start Pi-owned Chrome and prepare the MCP attach config. When an
    * `attachClient` factory was injected, the client is created here;
    * otherwise the caller builds its DevToolsClient from `attachConfig()`.
@@ -105,7 +154,6 @@ export class PersistentBackend {
     if (this.running()) return this.attachConfig()
     if (signal?.aborted) throw new Error('Persistent backend start aborted.')
     const profileDir = this.profileDir()
-    prepareBrowserProfile({ ...this.options.config, userDataDir: profileDir })
     try {
       this.lock = this.acquireLock(profileDir)
     } catch (error) {
@@ -123,6 +171,14 @@ export class PersistentBackend {
       throw error
     }
     try {
+      // Self-healing: reap Pi-managed orphans from crashed sessions before
+      // launching (same user-data-dir + debugging flags, never our pid,
+      // never a manually opened window). Best effort, never fatal.
+      const reaped = this.reapOrphans(profileDir)
+      if (reaped.length > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+      }
+      prepareBrowserProfile({ ...this.options.config, userDataDir: profileDir })
       // Pin the named Pi profile; migrate legacy layouts once, under lock.
       ensureNamedProfile(profileDir)
       // Explicit headed wins; otherwise infer from config (headless:false

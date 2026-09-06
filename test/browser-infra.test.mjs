@@ -176,6 +176,19 @@ describe('chrome launcher helpers', () => {
     assert.equal(frontProcessByPid(undefined), false)
   })
 
+  it('finds only Pi-managed chromes on the profile (never self, never manual)', async () => {
+    const { findManagedChromePids } = await import('../dist/chrome-launcher.js')
+    const ps = [
+      '  101 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --user-data-dir=/tmp/pi --profile-directory=pi-browser-use --remote-debugging-port=11111',
+      '  102 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --user-data-dir=/tmp/pi',
+      '  103 /Applications/Google Chrome --user-data-dir=/tmp/other --remote-debugging-port=22222',
+      '  104 /usr/bin/some-daemon --user-data-dir=/tmp/pi --remote-debugging-port=33333',
+      '  not-a-line',
+    ].join('\n')
+    assert.deepEqual(findManagedChromePids(ps, '/tmp/pi'), [101])
+    assert.deepEqual(findManagedChromePids(ps, '/tmp/pi', 101), [])
+  })
+
   it('pins the named Pi profile directory when requested', () => {
     const args = buildChromeArgs({
       userDataDir: '/tmp/pi-profile',

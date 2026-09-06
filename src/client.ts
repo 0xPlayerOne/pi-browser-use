@@ -213,6 +213,12 @@ export class DevToolsClient {
       }
       const errorName = error instanceof Error ? error.name : 'UnknownError'
       console.error(`[pi-browser-use] upstream tool call failed (${errorName})`)
+      // Existing mode fails most often on the consent gate: say so plainly.
+      if (this.config.sessionMode === 'existing') {
+        throw new Error(
+          'Browser tool call failed. If Chrome is showing an "Allow remote debugging?" prompt, click Allow and retry.'
+        )
+      }
       throw new Error('Browser tool call failed.')
     }
   }

@@ -91,6 +91,31 @@ export function findChromeExecutable(executablePath?: string): string {
   )
 }
 
+/**
+ * Parse `ps -eo pid,command` output for Pi-managed Chromes on a profile
+ * root: processes carrying our user-data-dir AND the named-profile marker.
+ * Pure (testable): the ps text is injected.
+ */
+export function findManagedChromePids(
+  psOutput: string,
+  userDataDir: string,
+  keepPid?: number
+): number[] {
+  const pids: number[] = []
+  for (const line of psOutput.split('\n')) {
+    const match = line.match(/^\s*(\d+)\s+(.*)$/)
+    if (!match) continue
+    const pid = Number(match[1])
+    const command = match[2] ?? ''
+    if (pid === keepPid) continue
+    if (!command.includes('Google Chrome') && !command.includes('chrome')) continue
+    if (!command.includes(`--user-data-dir=${userDataDir}`)) continue
+    if (!command.includes('--remote-debugging-port=')) continue
+    pids.push(pid)
+  }
+  return pids
+}
+
 /** Allocate a free loopback port (never hardcode 9222). */
 export function allocateEphemeralPort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -202,7 +227,15 @@ class OwnedChromeProcess implements ChromeProcess {
     ])
     if (!exited && !this.exited) {
       this.child.kill('SIGKILL')
-      await this.exitPromise
+      const killed = await Promise.race([
+        this.exitPromise.then(() => true),
+        new Promise<false>((resolve) => setTimeout(() => resolve(false), graceMs)),
+      ])
+      if (!killed) {
+        throw new Error(
+          `Chrome pid ${this.child.pid} refused to die (SIGTERM+SIGKILL); refusing to report a clean shutdown.`
+        )
+      }
     }
   }
 }
