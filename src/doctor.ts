@@ -6,8 +6,10 @@ export interface DoctorReport {
   mode: string
   headless: boolean
   launchesChrome: boolean
-  /** Who owns the Chrome process: Pi self-launch, MCP launch, or user attach. */
-  backend?: 'pi-owned' | 'mcp-launched' | 'attached-external'
+  /** Who owns the Chrome process: Pi self-launch, shared peer, MCP launch, or user attach. */
+  backend?: 'pi-owned' | 'shared' | 'mcp-launched' | 'attached-external'
+  /** Agent sessions currently holding claimed pages (including self). */
+  peers?: number
   /** Tab-bridge base URL when the Existing broker bridge is running. */
   bridgeUrl?: string | null
   profile: { dir: string | null; exists: boolean; writable: boolean }
@@ -36,7 +38,7 @@ function profileStatus(dir: string | null): { exists: boolean; writable: boolean
 export async function diagnose(
   config: BrowserUseConfig,
   listToolNames: () => Promise<string[]>,
-  extra?: { backend?: DoctorReport['backend']; bridgeUrl?: string | null }
+  extra?: { backend?: DoctorReport['backend']; bridgeUrl?: string | null; peers?: number }
 ): Promise<DoctorReport> {
   const launchesChrome = !config.browserUrl && !config.wsEndpoint && !config.autoConnect
   const dir =
@@ -53,6 +55,7 @@ export async function diagnose(
           ? 'mcp-launched'
           : 'attached-external'),
     bridgeUrl: extra?.bridgeUrl ?? null,
+    peers: extra?.peers ?? 0,
     profile: { dir, ...profileStatus(dir) },
     endpoint:
       config.browserUrl ?? config.wsEndpoint ?? (config.autoConnect ? 'auto-discovered' : null),
@@ -65,12 +68,17 @@ export function formatDoctorReport(report: DoctorReport, home: string = homedir(
   const backendLine =
     report.backend === 'pi-owned'
       ? 'Chrome: Pi-owned process for this session (self-launched profile, MCP attached).'
-      : report.launchesChrome
-        ? 'Chrome: launched by chrome-devtools-mcp for this session.'
-        : `Chrome: attached externally (${report.endpoint ?? 'unknown endpoint'}). Launch flags do not apply.`
+      : report.backend === 'shared'
+        ? 'Chrome: shared peer backend (owned by another live session; this session borrows pages only).'
+        : report.launchesChrome
+          ? 'Chrome: launched by chrome-devtools-mcp for this session.'
+          : `Chrome: attached externally (${report.endpoint ?? 'unknown endpoint'}). Launch flags do not apply.`
   const lines = [`Mode: ${report.mode} (headless: ${report.headless ? 'yes' : 'no'})`, backendLine]
   if (report.bridgeUrl) {
     lines.push(`Tab bridge: ${report.bridgeUrl} (Existing-mode broker).`)
+  }
+  if ((report.peers ?? 0) > 1) {
+    lines.push(`Sessions sharing this browser: ${report.peers} (page claims keep tabs separated).`)
   }
   if (report.profile.dir) {
     const display = report.profile.dir.replace(home, '~')

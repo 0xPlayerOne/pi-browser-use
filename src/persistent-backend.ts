@@ -25,7 +25,14 @@
 
 import { launchChrome, type ChromeLaunchOptions, type ChromeProcess } from './chrome-launcher.js'
 import { ensureNamedProfile, PI_PROFILE_NAME } from './named-profile.js'
-import { acquireProfileLock, type ProfileLockHandle } from './profile-lock.js'
+import { acquireProfileLock, ProfileLockedError, type ProfileLockHandle } from './profile-lock.js'
+import {
+  advertiseBackend,
+  newSessionId,
+  readLiveAdvert,
+  withdrawAdvert,
+  type BackendAdvert,
+} from './shared-backend.js'
 import { prepareBrowserProfile } from './profile.js'
 import { DEFAULT_PROFILE_DIR, type BrowserUseConfig } from './config.js'
 
@@ -38,6 +45,8 @@ export interface PersistentBackendOptions {
   config: BrowserUseConfig
   /** Headed (false = headless automation, true = visible fallback/auth). */
   headed?: boolean
+  /** Agent-session identity for the shared registry. Generated when omitted. */
+  sessionId?: string
   launch?: (options: ChromeLaunchOptions) => Promise<ChromeProcess>
   lock?: (profileDir: string) => ProfileLockHandle
   /** Build the MCP client already pointed at `browserUrl`. */
@@ -48,14 +57,22 @@ export class PersistentBackend {
   private chrome: ChromeProcess | undefined
   private lock: ProfileLockHandle | undefined
   private client: AttachedClient | undefined
+  private sharedAdvert: BackendAdvert | undefined
   private readonly launch: (options: ChromeLaunchOptions) => Promise<ChromeProcess>
   private readonly acquireLock: (profileDir: string) => ProfileLockHandle
   private readonly attachClient: ((config: BrowserUseConfig) => AttachedClient) | undefined
+  readonly sessionId: string
 
   constructor(private readonly options: PersistentBackendOptions) {
     this.launch = options.launch ?? launchChrome
     this.acquireLock = options.lock ?? ((dir) => acquireProfileLock(dir))
     this.attachClient = options.attachClient
+    this.sessionId = options.sessionId ?? newSessionId()
+  }
+
+  /** True when this session owns the Chrome process (may restart it). */
+  get owned(): boolean {
+    return this.sharedAdvert === undefined
   }
 
   profileDir(): string {
@@ -63,15 +80,15 @@ export class PersistentBackend {
   }
 
   browserUrl(): string | undefined {
-    return this.chrome?.browserUrl
+    try {
+      return this.effectiveBrowserUrl()
+    } catch {
+      return undefined
+    }
   }
 
   attached(): AttachedClient | undefined {
     return this.client
-  }
-
-  running(): boolean {
-    return this.chrome !== undefined && !this.chrome.exited
   }
 
   /** OS pid of the owned Chrome process, for explicit user-facing fronting. */
@@ -89,7 +106,22 @@ export class PersistentBackend {
     if (signal?.aborted) throw new Error('Persistent backend start aborted.')
     const profileDir = this.profileDir()
     prepareBrowserProfile({ ...this.options.config, userDataDir: profileDir })
-    this.lock = this.acquireLock(profileDir)
+    try {
+      this.lock = this.acquireLock(profileDir)
+    } catch (error) {
+      // A live peer owns Chrome: share it instead of failing. No lock, no
+      // kill rights — this session only borrows pages.
+      if (error instanceof ProfileLockedError) {
+        const advert = readLiveAdvert(profileDir)
+        if (advert) {
+          this.sharedAdvert = advert
+          const attach = this.attachConfig()
+          if (this.attachClient) this.client = this.attachClient(attach)
+          return attach
+        }
+      }
+      throw error
+    }
     try {
       // Pin the named Pi profile; migrate legacy layouts once, under lock.
       ensureNamedProfile(profileDir)
@@ -112,24 +144,48 @@ export class PersistentBackend {
       await this.stop()
       throw new Error('Persistent backend start aborted.')
     }
+    advertiseBackend(profileDir, {
+      pid: process.pid,
+      browserUrl: this.chrome.browserUrl,
+      port: this.chrome.port,
+      sessionId: this.sessionId,
+      startedAt: new Date().toISOString(),
+    })
     const attach = this.attachConfig()
     if (this.attachClient) this.client = this.attachClient(attach)
     return attach
   }
 
+  /** Effective browser URL: owned Chrome or the shared peer's. */
+  effectiveBrowserUrl(): string {
+    if (this.chrome) return this.chrome.browserUrl
+    if (this.sharedAdvert) return this.sharedAdvert.browserUrl
+    throw new Error('Persistent backend is not running.')
+  }
+
   /**
-   * MCP attach config: same session options, but pointed at Pi-owned Chrome.
-   * `userDataDir`/`isolated` are stripped — MCP must attach, not launch.
+   * MCP attach config: same session options, but pointed at Pi-owned Chrome
+   * (or the shared peer's). `userDataDir`/`isolated` are stripped — MCP
+   * must attach, not launch.
    */
   attachConfig(): BrowserUseConfig {
-    if (!this.chrome) throw new Error('Persistent backend is not running.')
+    const browserUrl = this.effectiveBrowserUrl()
     const { userDataDir: _userDataDir, isolated: _isolated, ...rest } = this.options.config
     void _userDataDir
     void _isolated
-    return { ...rest, browserUrl: this.chrome.browserUrl, isolated: false }
+    return { ...rest, browserUrl, isolated: false }
   }
 
-  /** Clean shutdown: close MCP client, quit Chrome, release the lock. */
+  running(): boolean {
+    if (this.sharedAdvert) return true
+    return this.chrome !== undefined && !this.chrome.exited
+  }
+
+  /**
+   * Clean shutdown. Owned: close client, quit Chrome, release lock,
+   * withdraw advert. Shared: close only our own MCP client — never touch
+   * the peer's browser.
+   */
   async stop(): Promise<void> {
     const errors: unknown[] = []
     if (this.client) {
@@ -139,6 +195,13 @@ export class PersistentBackend {
         errors.push(error)
       }
       this.client = undefined
+    }
+    if (this.sharedAdvert) {
+      this.sharedAdvert = undefined
+      if (errors.length > 0) {
+        throw new Error(`Shared backend stop reported errors: ${errors.map(String).join('; ')}`)
+      }
+      return
     }
     if (this.chrome) {
       try {
@@ -155,6 +218,7 @@ export class PersistentBackend {
         errors.push(error)
       }
       this.lock = undefined
+      withdrawAdvert(this.profileDir(), this.sessionId)
     }
     if (errors.length > 0) {
       throw new Error(
@@ -167,6 +231,12 @@ export class PersistentBackend {
 
   /** Restart into the other visibility (headless <-> headed fallback). */
   async restart(headed: boolean): Promise<BrowserUseConfig> {
+    if (this.sharedAdvert) {
+      throw new Error(
+        'Cannot restart a shared peer backend (owned by another live session). ' +
+          'Ask that session to switch visibility, or wait for it to exit.'
+      )
+    }
     await this.stop()
     this.options.headed = headed
     return this.start()

@@ -4,6 +4,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PersistentBackend, shouldSelfLaunch } from '../dist/persistent-backend.js'
+import { ProfileLockedError } from '../dist/profile-lock.js'
+import { advertiseBackend } from '../dist/shared-backend.js'
 
 function makeChrome(port = 54321) {
   return {
@@ -144,6 +146,76 @@ describe('PersistentBackend', () => {
       assert.equal(launches, 1)
     } finally {
       await backend.stop()
+    }
+  })
+})
+
+describe('shared attach', () => {
+  function sweep(profile) {
+    rmSync(profile, { recursive: true, force: true })
+    rmSync(`${profile}.backend.json`, { force: true })
+    rmSync(`${profile}.pages.json`, { force: true })
+  }
+
+  it('attaches to a live peer advert instead of failing on the lock', async () => {
+    const profile = mkdtempSync(join(tmpdir(), 'pi-shared-attach-'))
+    try {
+      advertiseBackend(profile, {
+        pid: process.pid,
+        browserUrl: 'http://127.0.0.1:58888',
+        port: 58888,
+        sessionId: 'peer-sess',
+        startedAt: new Date().toISOString(),
+      })
+      let launched = 0
+      const backend = new PersistentBackend({
+        config: { sessionMode: 'persistent', headless: true, userDataDir: profile },
+        launch: async () => {
+          launched += 1
+          throw new Error('must not launch')
+        },
+        lock: () => {
+          throw new ProfileLockedError(profile, 999)
+        },
+      })
+      const attach = await backend.start()
+      try {
+        assert.equal(attach.browserUrl, 'http://127.0.0.1:58888')
+        assert.equal(backend.owned, false)
+        assert.equal(backend.running(), true)
+        assert.equal(launched, 0)
+      } finally {
+        await backend.stop()
+      }
+    } finally {
+      sweep(profile)
+    }
+  })
+
+  it('restart refuses on a shared backend', async () => {
+    const profile = mkdtempSync(join(tmpdir(), 'pi-shared-restart-'))
+    try {
+      advertiseBackend(profile, {
+        pid: process.pid,
+        browserUrl: 'http://127.0.0.1:58887',
+        port: 58887,
+        sessionId: 'peer-sess',
+        startedAt: new Date().toISOString(),
+      })
+      const backend = new PersistentBackend({
+        config: { userDataDir: profile },
+        launch: async () => {
+          throw new Error('must not launch')
+        },
+        lock: () => {
+          throw new ProfileLockedError(profile, 999)
+        },
+      })
+      await backend.start()
+      await assert.rejects(() => backend.restart(true), /shared peer backend/)
+      await backend.stop()
+    } finally {
+      sweep(profile)
     }
   })
 })

@@ -43,6 +43,16 @@ Turnstile, device checks, SSO/2FA cannot be automated away. On hitting one: stop
 - Prefer `allowedUrlPattern` to cage the session to the task domains.
 - `redactNetworkHeaders` stays on; never paste secrets into pages.
 
+## Parallel agents (shared browser)
+
+Many agents share one Pi-owned Chrome. Separation is by tabs, not windows:
+
+- Always pass an explicit `pageId` (from your own `browser_list_pages`) to every page-scoped call. Never assume the selected page is yours.
+- Open your own tabs (`browser_new_page` background, or `browser_open_background_tab` in existing mode). They are claimed to your session automatically.
+- Never close another session's tabs: `browser_close_page` refuses anything you didn't open unless `force: true` — and force needs the user's explicit word for that exact tab.
+- Your session id shows in `browser_status`; `browser_doctor` shows how many sessions share the browser.
+- Never restart, reauth, or switch visibility of a shared backend owned by someone else — coordinate with that session instead.
+
 ## Browser mode rules
 
 1. Prefer Persistent (the default) for everything: Pi's browser, invisible, no popups.

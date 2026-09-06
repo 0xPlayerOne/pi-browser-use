@@ -34,6 +34,14 @@ import {
   openExistingPage,
   parseMcpPageList,
 } from './existing-flow.js'
+import {
+  checkSharedCloseAllowed,
+  claimPage,
+  livePeerSessions,
+  newSessionId,
+  pruneDeadOwners,
+  releasePages,
+} from './shared-backend.js'
 import { applyNewPageDefaults, applySelectPageDefaults } from './focus-policy.js'
 import { frontProcessByPid } from './chrome-launcher.js'
 import { PersistentBackend, shouldSelfLaunch } from './persistent-backend.js'
@@ -178,6 +186,15 @@ export default function browserUseExtension(pi: Pi) {
   // URLs Pi opened or navigated to in Existing mode (raw + normalized): the
   // only close_page targets allowed there without explicit force:true.
   const piOwnedUrls = new Set<string>()
+  // This extension load's agent-session identity for the shared registry.
+  const sessionId = newSessionId()
+  const myOwner = { sessionId, pid: process.pid }
+  const shortSession = sessionId.slice(0, 8)
+
+  /** Registry home: the persistent profile, or the default home for existing. */
+  function registryDir(): string {
+    return currentMode === 'persistent' ? persistentProfileDir(config ?? {}) : DEFAULT_PROFILE_DIR
+  }
 
   function trackPiUrl(url: string) {
     piOwnedUrls.add(url)
@@ -262,7 +279,7 @@ export default function browserUseExtension(pi: Pi) {
           backendNote = ` (${normalizeOrigin(lastOrigin)} prefers the visible fallback)`
         }
       }
-      ownBackend = new PersistentBackend({ config: next, headed: effectiveHeaded })
+      ownBackend = new PersistentBackend({ config: next, headed: effectiveHeaded, sessionId })
       const attach = await ownBackend.start(signal)
       client = new DevToolsClient(attach)
       markAutomationResult(profileDir, effectiveHeaded ? 'headed' : 'headless')
@@ -456,13 +473,34 @@ export default function browserUseExtension(pi: Pi) {
             // In Existing mode a Pi-driven navigation marks the destination
             // as Pi-touched for the close guard below.
             if (currentMode === 'existing') trackPiUrl(effectiveParams.url)
+            // Claim navigated pages for this session so peer agents in a
+            // shared browser can tell ours apart (best effort, never fatal).
+            if (
+              originalName === 'navigate_page' &&
+              (currentMode === 'persistent' || currentMode === 'existing') &&
+              typeof effectiveParams.pageId === 'number'
+            ) {
+              try {
+                claimPage(
+                  registryDir(),
+                  { pageId: effectiveParams.pageId, url: effectiveParams.url },
+                  myOwner
+                )
+              } catch {
+                // Ownership is coordination metadata, not the task itself.
+              }
+            }
           }
-          // Existing mode never closes user tabs: close_page carries a
-          // force gate and a Pi-ownership check (spec 19).
+          // Never close another session's tabs: Existing mode checks Pi URL
+          // ownership (spec 19); a shared persistent backend checks the page
+          // registry instead. Both yield to explicit force:true.
           if (originalName === 'close_page') {
             const { force: _force, ...closeArgs } = effectiveParams
             void _force
-            if (currentMode === 'existing' && effectiveParams.force !== true) {
+            const wantsForce = effectiveParams.force === true
+            const sharedPersistent =
+              currentMode === 'persistent' && !!ownBackend && !ownBackend.owned
+            if ((currentMode === 'existing' || sharedPersistent) && !wantsForce) {
               if (typeof effectiveParams.pageId !== 'number') {
                 return {
                   content: [{ type: 'text', text: 'close_page needs a numeric pageId.' }],
@@ -473,11 +511,16 @@ export default function browserUseExtension(pi: Pi) {
               const entries = parseMcpPageList(
                 await callUpstream(browser, 'list_pages', {}, signal)
               )
-              const verdict = checkExistingCloseAllowed(
-                entries,
-                effectiveParams.pageId,
-                piOwnedUrls
-              )
+              const verdict =
+                currentMode === 'existing'
+                  ? checkExistingCloseAllowed(entries, effectiveParams.pageId, piOwnedUrls)
+                  : checkSharedCloseAllowed(
+                      entries,
+                      effectiveParams.pageId,
+                      registryDir(),
+                      myOwner,
+                      piOwnedUrls
+                    )
               if (!verdict.ok) {
                 return {
                   content: [{ type: 'text', text: verdict.reason }],
@@ -487,6 +530,13 @@ export default function browserUseExtension(pi: Pi) {
               }
             }
             const result = await callUpstream(browser, originalName, closeArgs, signal)
+            if (!result.isError && typeof effectiveParams.pageId === 'number') {
+              try {
+                releasePages(registryDir(), { pageId: effectiveParams.pageId })
+              } catch {
+                // Registry hygiene never fails the close itself.
+              }
+            }
             return { ...toToolContent(result, originalName), details: undefined }
           }
           let result = await callUpstream(browser, originalName, effectiveParams, signal)
@@ -764,7 +814,7 @@ export default function browserUseExtension(pi: Pi) {
         const profileDir = persistentProfileDir(config ?? {})
         const meta = loadPersistentMetadata(profileDir)
         const sitePins = loadSitePreferences(profileDir).length
-        const lines = ['Pi Browser', '──────────']
+        const lines = ['Pi Browser', '──────────', `Session: ${shortSession}`]
         if (mode === 'fresh') {
           lines.push('Profile: Ephemeral (nothing persists)')
           lines.push('Execution: Headless')
@@ -827,6 +877,17 @@ export default function browserUseExtension(pi: Pi) {
             ? params.url
             : (lastOrigin ?? 'this page')
         const variant: ReauthVariant = params.variant === 'plain' ? 'plain' : 'instrumented'
+        if (ownBackend && !ownBackend.owned) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Another live agent session owns the persistent browser (shared mode). Reauth must happen there — ask that session to run browser_reauth, or wait for it to exit and retry.',
+              },
+            ],
+            details: undefined,
+          }
+        }
         if (!ownBackend) {
           // Legacy MCP-launched persistent: headed switch is the reauth path.
           await switchBackend('persistent', true, signal)
@@ -845,6 +906,7 @@ export default function browserUseExtension(pi: Pi) {
         const backend = new PersistentBackend({
           config: config ?? {},
           headed: variant === 'instrumented',
+          sessionId,
         })
         ownBackend = backend
         const message = await runReauth({
@@ -928,6 +990,13 @@ export default function browserUseExtension(pi: Pi) {
           { timeoutMs, signal }
         )
         trackPiUrl(params.url)
+        if (result.pageId !== undefined) {
+          try {
+            claimPage(registryDir(), { pageId: result.pageId, url: params.url }, myOwner)
+          } catch {
+            // Ownership is coordination metadata, not the task itself.
+          }
+        }
         const selectHint =
           result.pageId !== undefined
             ? ` Select it with browser_select_page (it stays in the background).`
@@ -954,12 +1023,19 @@ export default function browserUseExtension(pi: Pi) {
       parameters: Type.Object({}),
       async execute() {
         await ensureConnected()
+        let peers = 0
+        try {
+          peers = livePeerSessions(registryDir()).length
+        } catch {
+          peers = 0
+        }
         const report = await diagnose(
           config ?? {},
           async () => (await client!.listAllTools()).map((tool) => tool.name),
           {
-            backend: ownBackend ? 'pi-owned' : undefined,
+            backend: ownBackend ? (ownBackend.owned ? 'pi-owned' : 'shared') : undefined,
             bridgeUrl: bridge?.baseUrl() ?? null,
+            peers,
           }
         )
         return { content: [{ type: 'text', text: formatDoctorReport(report) }], details: undefined }
@@ -1011,7 +1087,7 @@ export default function browserUseExtension(pi: Pi) {
     currentMode = describeMode()
     if (currentMode === 'persistent' && shouldSelfLaunch(config)) {
       // Phase 2: Pi owns the persistent Chrome process; MCP attaches.
-      ownBackend = new PersistentBackend({ config, headed: config.headless === false })
+      ownBackend = new PersistentBackend({ config, headed: config.headless === false, sessionId })
       client = new DevToolsClient(await ownBackend.start())
     } else {
       prepareBrowserProfile(config)
@@ -1032,6 +1108,14 @@ export default function browserUseExtension(pi: Pi) {
 
   pi.on('session_shutdown', async () => {
     await teardownBackend()
+    // Release this session's page claims in every scope it may have used.
+    for (const scope of new Set([persistentProfileDir(config ?? {}), DEFAULT_PROFILE_DIR])) {
+      try {
+        releasePages(scope, { sessionId })
+      } catch {
+        // Best effort.
+      }
+    }
     if (bridge) {
       try {
         await bridge.stop()
