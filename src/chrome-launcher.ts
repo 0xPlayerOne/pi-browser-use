@@ -17,7 +17,7 @@
  * so it looks like an ordinary manually launched browser.
  */
 
-import { spawn, type ChildProcess } from 'node:child_process'
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { createServer } from 'node:net'
 
@@ -241,6 +241,35 @@ export async function launchChrome(options: ChromeLaunchOptions): Promise<Chrome
     throw error
   }
   return new OwnedChromeProcess(child, port, `http://127.0.0.1:${port}`, options.userDataDir)
+}
+
+/**
+ * AppleScript that raises the exact Chrome process by pid. Unlike app-level
+ * `activate` (which may front the user's daily windows instead), this targets
+ * Pi-owned Chrome only. Foreground is reserved for explicit user-requested
+ * views and auth handoffs — never automation.
+ */
+export function buildFrontProcessScript(pid: number): string {
+  return [
+    'tell application "System Events"',
+    `set frontmost of (first application process whose unix id is ${pid}) to true`,
+    'end tell',
+  ].join('\n')
+}
+
+/** Best-effort fronting of Pi-owned Chrome (macOS only). Returns success. */
+export function frontProcessByPid(
+  pid: number | undefined,
+  runner?: (cmd: string, args: string[]) => void
+): boolean {
+  if (pid === undefined || process.platform !== 'darwin') return false
+  try {
+    const run = runner ?? ((cmd: string, args: string[]) => void execFileSync(cmd, args))
+    run('osascript', ['-e', buildFrontProcessScript(pid)])
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**

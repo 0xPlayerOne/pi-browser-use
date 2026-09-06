@@ -35,6 +35,7 @@ import {
   parseMcpPageList,
 } from './existing-flow.js'
 import { applyNewPageDefaults, applySelectPageDefaults } from './focus-policy.js'
+import { frontProcessByPid } from './chrome-launcher.js'
 import { PersistentBackend, shouldSelfLaunch } from './persistent-backend.js'
 import {
   loadPersistentMetadata,
@@ -361,7 +362,9 @@ export default function browserUseExtension(pi: Pi) {
   /**
    * Rebuild the current backend headed so a human can act (log in, clear
    * a challenge), then tell the agent exactly what to relay. Attach
-   * sessions are already visible and owned by the user: prompt only.
+   * sessions are already visible and owned by the user: prompt only. The
+   * headed window is navigated to the blocked page and fronted: auth
+   * handoff is the one case where taking foreground is the job, not a bug.
    */
   async function escalateToHeaded(url: string, signal?: AbortSignal): Promise<string> {
     const mode: BrowserMode = currentMode === 'persistent' ? 'persistent' : 'fresh'
@@ -370,7 +373,18 @@ export default function browserUseExtension(pi: Pi) {
     } catch (error) {
       return `\n\nBlocked on ${url} and the headed browser failed to launch (${error instanceof Error ? error.message : String(error)}). Ask the user to proceed manually.`
     }
-    return `\n\nBlocked on ${url}: a browser window just opened (same ${mode} session — previous tabs are gone, re-list pages after). Please complete the login or challenge in that window, then tell the agent to continue. Do not close the window until done.`
+    if (/^https?:\/\//.test(url)) {
+      // Best effort: the window is already open for manual navigation.
+      try {
+        await callUpstream(client!, 'new_page', { url, background: false }, signal)
+      } catch {
+        // Manual navigation in the opened window covers this.
+      }
+    }
+    // Front Pi-owned Chrome so the handoff window is actually visible.
+    // Fresh MCP-launched Chrome fronts itself; only Pi-owned needs help.
+    if (ownBackend) frontProcessByPid(ownBackend.pid())
+    return `\n\nBlocked on ${url}: a browser window just opened on that page (same ${mode} session — previous tabs are gone, re-list pages after). Please complete the login or challenge in that window, then tell the agent to continue. Do not close the window until done.`
   }
 
   function pageUrlFromSnapshot(text: string): string | undefined {

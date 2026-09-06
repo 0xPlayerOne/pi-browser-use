@@ -74,6 +74,11 @@ export class PersistentBackend {
     return this.chrome !== undefined && !this.chrome.exited
   }
 
+  /** OS pid of the owned Chrome process, for explicit user-facing fronting. */
+  pid(): number | undefined {
+    return this.chrome?.pid
+  }
+
   /**
    * Start Pi-owned Chrome and prepare the MCP attach config. When an
    * `attachClient` factory was injected, the client is created here;

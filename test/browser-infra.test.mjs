@@ -155,6 +155,27 @@ describe('chrome launcher helpers', () => {
     assert.ok(!args.includes('--headless'))
   })
 
+  it('builds pid-fronting and marker-fronting scripts without running anything', async () => {
+    const { buildFrontProcessScript, buildFocusWindowScript, frontProcessByPid } =
+      await import('../dist/chrome-launcher.js')
+    assert.match(buildFrontProcessScript(1234), /unix id is 1234/)
+    assert.match(
+      buildFocusWindowScript('https://x.example/?a'),
+      /starts with "https:\/\/x\.example/
+    )
+    const seen = []
+    assert.equal(
+      frontProcessByPid(4321, (cmd, args) => void seen.push([cmd, args])) &&
+        process.platform === 'darwin',
+      process.platform === 'darwin'
+    )
+    if (process.platform === 'darwin') {
+      assert.equal(seen[0][0], 'osascript')
+      assert.match(seen[0][1][1], /unix id is 4321/)
+    }
+    assert.equal(frontProcessByPid(undefined), false)
+  })
+
   it('pins the named Pi profile directory when requested', () => {
     const args = buildChromeArgs({
       userDataDir: '/tmp/pi-profile',
