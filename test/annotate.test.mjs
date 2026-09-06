@@ -21,10 +21,7 @@ describe('annotate', () => {
     assert.deepEqual(parseAnnotatedElements(text), [
       { n: 1, x: 10, y: 20, tag: 'button', text: 'Save' },
     ])
-    assert.equal(
-      formatAnnotatedMap(parseAnnotatedElements(text)),
-      '1: (10, 20) button "Save"'
-    )
+    assert.equal(formatAnnotatedMap(parseAnnotatedElements(text)), '1: (10, 20) button "Save"')
   })
 
   it('returns empty results on malformed output', () => {
@@ -48,10 +45,7 @@ describe('doctor', () => {
   })
 
   it('flags attached sessions where launch flags do not apply', async () => {
-    const report = await diagnose(
-      { sessionMode: 'existing', autoConnect: true },
-      async () => []
-    )
+    const report = await diagnose({ sessionMode: 'existing', autoConnect: true }, async () => [])
     assert.equal(report.launchesChrome, false)
     assert.match(formatDoctorReport(report), /do not apply/)
   })
