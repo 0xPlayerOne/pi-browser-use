@@ -46,6 +46,7 @@ describe('PersistentBackend', () => {
       assert.equal(attach.userDataDir, undefined)
       assert.equal(attach.isolated, false)
       assert.equal(seen[0].headless, true)
+      assert.equal(seen[0].profileDirectory, 'pi-browser-use')
       assert.equal(backend.running(), true)
       assert.equal(backend.browserUrl(), 'http://127.0.0.1:54321')
     } finally {

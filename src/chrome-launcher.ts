@@ -23,6 +23,8 @@ import { createServer } from 'node:net'
 
 export interface ChromeLaunchOptions {
   userDataDir: string
+  /** Named profile directory inside userDataDir (e.g. pi-browser-use). */
+  profileDirectory?: string
   /** Ephemeral loopback port. Allocated automatically when omitted. */
   port?: number
   headless?: boolean
@@ -111,6 +113,7 @@ export function allocateEphemeralPort(): Promise<number> {
  */
 export function buildChromeArgs(options: {
   userDataDir: string
+  profileDirectory?: string
   port?: number
   headless?: boolean
   chromeArgs?: string[]
@@ -120,6 +123,7 @@ export function buildChromeArgs(options: {
     '--no-first-run',
     '--no-default-browser-check',
   ]
+  if (options.profileDirectory) args.push(`--profile-directory=${options.profileDirectory}`)
   if (options.port !== undefined && options.port > 0) {
     args.push(`--remote-debugging-port=${options.port}`)
     args.push('--remote-allow-origins=*')
@@ -212,6 +216,7 @@ export async function launchChrome(options: ChromeLaunchOptions): Promise<Chrome
   const port = options.port ?? (await allocateEphemeralPort())
   const args = buildChromeArgs({
     userDataDir: options.userDataDir,
+    profileDirectory: options.profileDirectory,
     port,
     headless: options.headless,
     chromeArgs: options.chromeArgs,
@@ -245,11 +250,16 @@ export async function launchChrome(options: ChromeLaunchOptions): Promise<Chrome
  */
 export async function launchSetupBrowser(options: {
   userDataDir: string
+  profileDirectory?: string
   executablePath?: string
   chromeArgs?: string[]
 }): Promise<number | null> {
   const executable = findChromeExecutable(options.executablePath)
-  const args = buildChromeArgs({ userDataDir: options.userDataDir, chromeArgs: options.chromeArgs })
+  const args = buildChromeArgs({
+    userDataDir: options.userDataDir,
+    profileDirectory: options.profileDirectory,
+    chromeArgs: options.chromeArgs,
+  })
   const child = spawn(executable, args, { stdio: 'ignore', detached: false })
   return new Promise((resolve, reject) => {
     child.on('error', reject)

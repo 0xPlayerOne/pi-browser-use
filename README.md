@@ -36,11 +36,11 @@ Settings key is `pi-browser-use` in `~/.pi/agent/settings.json` (user) or `.pi/s
 
 `persistent` is already the default; the snippet above pins it explicitly. There is no consent popup in this mode — Chrome's per-session "Allow remote debugging?" gate applies to `existing` only.
 
-| `mode`            | Behavior                                                                     |
-| ----------------- | ---------------------------------------------------------------------------- |
-| `persistent` (default) | Pi's own browser: saved profile with your logins (`~/.pi/browser-profile`) |
-| `fresh`           | Isolated clean room, thrown away each session                                |
-| `existing`        | Attach to your running Chrome — consent popup each session, avoid by default |
+| `mode`                 | Behavior                                                                     |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| `persistent` (default) | Pi's own browser: saved profile with your logins (`~/.pi/browser-profile`)   |
+| `fresh`                | Isolated clean room, thrown away each session                                |
+| `existing`             | Attach to your running Chrome — consent popup each session, avoid by default |
 
 `headed: true` shows the window (both modes default headless); `existing` is always headed. `visionModel` enables `browser_analyze_screenshot`; omit it and the tool stays unregistered.
 
@@ -151,6 +151,8 @@ Call `browser_list_pages` first, then pass its numeric `pageId` to page-scoped t
 
 ## Browser profile
 
+The persistent browser lives in a Chrome profile directory named `pi-browser-use` inside `~/.pi/browser-profile` (one-time automatic migration from legacy `Default`/`Profile 1` layouts while Chrome is stopped), so Pi's cookies and logins are always distinguishable on disk from anything else.
+
 On startup the default persistent profile is checked for accessibility. A root-owned or unreadable default (typically from running under `sudo`) is moved aside to `~/.pi/browser-profile.inaccessible-<timestamp>` so Chrome starts fresh instead of showing a preferences dialog. An explicit custom `userDataDir` in the same state fails fast with an ownership remediation hint. Never run the agent (or anything launching this browser) via `sudo`.
 
 ## Performance
@@ -178,7 +180,7 @@ On startup the default persistent profile is checked for accessibility. A root-o
 | `profile is already in use`        | Two sessions sharing one `userDataDir`                                                  | Use isolated mode or separate dirs per session                                       |
 | Stale uid errors                   | Page re-rendered after your snapshot                                                    | Take a fresh snapshot; ids invalidate on every action                                |
 | Vision tool missing                | No `visionModel` configured                                                             | Add it; otherwise use tree uids, or the global `vision` skill for vision-less models |
-| "Allow remote debugging?" popup  | Chrome 144+ consent gate for MCP auto-attach in Existing mode                           | Click Allow (once per Pi session); persistent mode never triggers it                 |
+| "Allow remote debugging?" popup    | Chrome 144+ consent gate for MCP auto-attach in Existing mode                           | Click Allow (once per Pi session); persistent mode never triggers it                 |
 | Pi tab closed the wrong tab        | Page IDs shift when tabs close — fixed                                                  | Existing `close_page` now refuses tabs Pi didn't open unless `force: true`           |
 
 ## License

@@ -155,6 +155,17 @@ describe('chrome launcher helpers', () => {
     assert.ok(!args.includes('--headless'))
   })
 
+  it('pins the named Pi profile directory when requested', () => {
+    const args = buildChromeArgs({
+      userDataDir: '/tmp/pi-profile',
+      profileDirectory: 'pi-browser-use',
+      port: 11111,
+      headless: true,
+    })
+    assert.ok(args.includes('--profile-directory=pi-browser-use'))
+    assert.ok(args.includes('--user-data-dir=/tmp/pi-profile'))
+  })
+
   it('allocates distinct ephemeral ports', async () => {
     const a = await allocateEphemeralPort()
     const b = await allocateEphemeralPort()

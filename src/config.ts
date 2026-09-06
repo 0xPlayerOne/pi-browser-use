@@ -1,5 +1,6 @@
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { PI_PROFILE_NAME } from './named-profile.js'
 
 export const DEFAULT_PROFILE_DIR = join(homedir(), '.pi', 'browser-profile')
 
@@ -232,6 +233,15 @@ export function configToArgs(config: BrowserUseConfig): string[] {
   }
   for (const flag of resolved.chromeArgs ?? []) {
     args.push(`--chrome-arg=${flag}`)
+  }
+  if (
+    resolved.sessionMode === 'persistent' &&
+    !resolved.browserUrl &&
+    !resolved.wsEndpoint &&
+    !resolved.autoConnect
+  ) {
+    // MCP-launched persistent Chrome must use the same named Pi profile.
+    args.push(`--chrome-arg=--profile-directory=${PI_PROFILE_NAME}`)
   }
   if (resolved.extraArgs) args.push(...resolved.extraArgs)
   return args

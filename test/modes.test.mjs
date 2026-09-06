@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveModeTarget } from '../dist/config.js'
+import { configToArgs, resolveModeTarget } from '../dist/config.js'
 
 describe('resolveModeTarget', () => {
   it('fresh means isolated with attach fields stripped, headless by default', () => {
@@ -49,6 +49,20 @@ describe('resolveModeTarget', () => {
     const next = resolveModeTarget({ userDataDir: '/tmp/mine' }, 'persistent', true)
     assert.equal(next.headless, false)
     assert.equal(next.userDataDir, '/tmp/mine')
+  })
+
+  it('persistent launches pin the named Pi profile for MCP-launched Chrome', () => {
+    const args = configToArgs({ sessionMode: 'persistent', userDataDir: '/tmp/mine' })
+    assert.ok(args.includes('--chrome-arg=--profile-directory=pi-browser-use'))
+  })
+
+  it('attach and fresh configs never carry the profile-directory flag', () => {
+    assert.ok(
+      !configToArgs({ sessionMode: 'persistent', browserUrl: 'http://127.0.0.1:1' }).some((a) =>
+        a.includes('profile-directory')
+      )
+    )
+    assert.ok(!configToArgs({ mode: 'fresh' }).some((a) => a.includes('profile-directory')))
   })
 
   it('existing attaches to the user Chrome: autoConnect, headed, no owned profile', () => {

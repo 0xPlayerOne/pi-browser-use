@@ -24,6 +24,7 @@
  */
 
 import { launchChrome, type ChromeLaunchOptions, type ChromeProcess } from './chrome-launcher.js'
+import { ensureNamedProfile, PI_PROFILE_NAME } from './named-profile.js'
 import { acquireProfileLock, type ProfileLockHandle } from './profile-lock.js'
 import { prepareBrowserProfile } from './profile.js'
 import { DEFAULT_PROFILE_DIR, type BrowserUseConfig } from './config.js'
@@ -85,8 +86,11 @@ export class PersistentBackend {
     prepareBrowserProfile({ ...this.options.config, userDataDir: profileDir })
     this.lock = this.acquireLock(profileDir)
     try {
+      // Pin the named Pi profile; migrate legacy layouts once, under lock.
+      ensureNamedProfile(profileDir)
       this.chrome = await this.launch({
         userDataDir: profileDir,
+        profileDirectory: PI_PROFILE_NAME,
         headless: !(this.options.headed ?? false),
         chromeArgs: this.options.config.chromeArgs,
         executablePath: this.options.config.executablePath,

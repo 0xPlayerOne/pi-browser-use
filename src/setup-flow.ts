@@ -20,6 +20,7 @@
  */
 
 import { launchChrome, launchSetupBrowser, type ChromeProcess } from './chrome-launcher.js'
+import { ensureNamedProfile, PI_PROFILE_NAME } from './named-profile.js'
 import type { PersistentBackend } from './persistent-backend.js'
 import { markBootstrapped } from './persistent-store.js'
 import { DEFAULT_PROFILE_DIR } from './config.js'
@@ -66,6 +67,7 @@ export async function runBootstrap(
     chromeArgs?: string[]
     launch?: (options: {
       userDataDir: string
+      profileDirectory?: string
       executablePath?: string
       chromeArgs?: string[]
     }) => Promise<number | null>
@@ -74,9 +76,12 @@ export async function runBootstrap(
 ): Promise<number | null> {
   const profileDir = options.profileDir ?? DEFAULT_PROFILE_DIR
   events?.onSetupNeeded?.(SETUP_INSTRUCTIONS)
+  // Same named identity automation uses: sign in here, automate there.
+  ensureNamedProfile(profileDir)
   const launch = options.launch ?? launchSetupBrowser
   const code = await launch({
     userDataDir: profileDir,
+    profileDirectory: PI_PROFILE_NAME,
     executablePath: options.executablePath,
     chromeArgs: options.chromeArgs,
   })
@@ -93,6 +98,7 @@ export interface ReauthOptions {
   /** Plain-variant launcher (no CDP). Defaults to launchSetupBrowser. */
   launchPlain?: (options: {
     userDataDir: string
+    profileDirectory?: string
     executablePath?: string
     chromeArgs?: string[]
   }) => Promise<number | null>
@@ -115,7 +121,7 @@ export async function runReauth(options: ReauthOptions): Promise<string> {
   options.events?.onReauthNeeded?.(message)
   if (variant === 'plain') {
     const launch = options.launchPlain ?? launchSetupBrowser
-    await launch({ userDataDir: profileDir })
+    await launch({ userDataDir: profileDir, profileDirectory: PI_PROFILE_NAME })
   } else {
     if (options.restartBackend) {
       await options.restartBackend(true)
