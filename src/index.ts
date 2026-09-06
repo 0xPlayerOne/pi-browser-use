@@ -274,6 +274,9 @@ export default function browserUseExtension(pi: Pi) {
       client = new DevToolsClient(next)
     }
     await client.ensureReady(signal)
+    // Record what actually launched (a per-origin pin may have upgraded
+    // headless to headed-background) so status/doctor tell the truth.
+    next.headless = !effectiveHeaded
     config = next
     currentMode = mode
     return { next, effectiveHeaded, backendNote }
