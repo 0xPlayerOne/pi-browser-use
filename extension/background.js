@@ -166,3 +166,20 @@ async function pollBridgeOnce() {
 setInterval(() => {
   void pollBridgeOnce().catch(() => {})
 }, PI_BRIDGE_POLL_MS)
+
+/**
+ * MV3 service workers are short-lived: setInterval dies permanently once the
+ * worker is evicted, so the fast poll above only covers the awake case. The
+ * repeating alarm wakes a suspended worker and guarantees a poll at least
+ * every minute (safe floor for the alarm cadence). Re-created on every
+ * startup since alarm persistence across restarts is not guaranteed.
+ */
+const PI_BRIDGE_ALARM = 'pi-bridge-poll'
+try {
+  chrome.alarms?.create(PI_BRIDGE_ALARM, { periodInMinutes: 1 })
+  chrome.alarms?.onAlarm.addListener((alarm) => {
+    if (alarm && alarm.name === PI_BRIDGE_ALARM) void pollBridgeOnce().catch(() => {})
+  })
+} catch {
+  // Alarms unavailable: the interval poll remains the only trigger.
+}

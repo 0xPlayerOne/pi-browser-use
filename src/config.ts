@@ -162,6 +162,11 @@ export function resolveConfig(config?: BrowserUseConfig): BrowserUseConfig {
   } else if (headed !== undefined) {
     resolved.headless = !headed
   }
+  // Existing attaches to the user's visible Chrome: always headed, so a
+  // stale headless default never leaks into flags or status output.
+  if (resolved.sessionMode === 'existing') {
+    resolved.headless = false
+  }
   if (resolved.allowedUrlPattern?.length && resolved.blockedUrlPattern?.length) {
     throw new Error('allowedUrlPattern and blockedUrlPattern cannot be used together')
   }

@@ -28,7 +28,7 @@ import {
   parseAnnotatedElements,
 } from './annotate.js'
 import { diagnose, formatDoctorReport } from './doctor.js'
-import { openExistingPage } from './existing-flow.js'
+import { openExistingPage, parseMcpPageList } from './existing-flow.js'
 import { applyNewPageDefaults, applySelectPageDefaults } from './focus-policy.js'
 import { PersistentBackend, shouldSelfLaunch } from './persistent-backend.js'
 import {
@@ -334,28 +334,9 @@ export default function browserUseExtension(pi: Pi) {
     return text.match(/\burl="([^"]+)"/)?.[1]
   }
 
-  /** Best-effort MCP page list → entries (structured first, text scan fallback). */
+  /** Best-effort MCP page list → entries (shared parser, never throws). */
   function mcpPageEntries(result: unknown): Array<{ pageId: number; url?: string }> {
-    const entries: Array<{ pageId: number; url?: string }> = []
-    const structured = (result as { structuredContent?: unknown }).structuredContent
-    const candidates: unknown[] = Array.isArray(structured)
-      ? structured
-      : Array.isArray((structured as { pages?: unknown })?.pages)
-        ? ((structured as { pages?: unknown[] }).pages as unknown[])
-        : []
-    for (const candidate of candidates) {
-      const entry = candidate as { pageId?: unknown; id?: unknown; url?: unknown }
-      const id = typeof entry.pageId === 'number' ? entry.pageId : entry.id
-      if (typeof id === 'number') {
-        entries.push({ pageId: id, url: typeof entry.url === 'string' ? entry.url : undefined })
-      }
-    }
-    if (entries.length > 0) return entries
-    const text = extractTextContent((result as UpstreamResult).content)
-    for (const match of text.matchAll(/pageId"?\s*[:=]\s*"?(\d+)/g)) {
-      entries.push({ pageId: Number(match[1]) })
-    }
-    return entries
+    return parseMcpPageList(result)
   }
 
   async function ensureConnected(signal?: AbortSignal) {
@@ -791,7 +772,10 @@ export default function browserUseExtension(pi: Pi) {
       parameters: Type.Object({
         url: Type.String({ description: 'URL to open in a background Pi tab.' }),
         timeoutMs: Type.Optional(
-          Type.Number({ description: 'How long to wait for the extension (default 30000).' })
+          Type.Number({
+            description:
+              'How long to wait for the extension (default 90000: a suspended worker wakes on the ~1min alarm cadence).',
+          })
         ),
       }),
       async execute(_toolCallId, params, signal) {
@@ -813,7 +797,7 @@ export default function browserUseExtension(pi: Pi) {
         }
         const activeBridge = await ensureBridge()
         const timeoutMs =
-          typeof params.timeoutMs === 'number' && params.timeoutMs > 0 ? params.timeoutMs : 30_000
+          typeof params.timeoutMs === 'number' && params.timeoutMs > 0 ? params.timeoutMs : 90_000
         const result = await openExistingPage(
           params.url,
           {

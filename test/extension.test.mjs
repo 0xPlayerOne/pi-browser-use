@@ -52,4 +52,11 @@ describe('existing-mode tab broker extension', () => {
       'needs loopback host permission for bridge polling'
     )
   })
+
+  it('wakes a suspended worker via repeating alarm (setInterval dies with MV3 workers)', () => {
+    assert.ok(manifest.permissions.includes('alarms'), 'needs alarms to wake the worker')
+    assert.match(background, /alarms\?\.create\(PI_BRIDGE_ALARM/)
+    assert.match(background, /onAlarm\.addListener/)
+    assert.match(background, /periodInMinutes: 1/)
+  })
 })

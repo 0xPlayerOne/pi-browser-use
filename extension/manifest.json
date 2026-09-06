@@ -3,7 +3,7 @@
   "name": "Pi Browser Use — Existing-mode tab broker",
   "version": "0.2.0",
   "description": "Brokers Pi-created tabs into the collapsed pi-browser-use group without stealing focus.",
-  "permissions": ["tabs", "tabGroups", "storage"],
+  "permissions": ["tabs", "tabGroups", "storage", "alarms"],
   "host_permissions": ["http://127.0.0.1/*"],
   "background": {
     "service_worker": "background.js"

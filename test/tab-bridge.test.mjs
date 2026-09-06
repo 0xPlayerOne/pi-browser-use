@@ -149,6 +149,31 @@ describe('TabBridge', () => {
   })
 })
 
+describe('parseMcpPageList', () => {
+  it('parses N: title (url) text lines', async () => {
+    const { parseMcpPageList } = await import('../dist/existing-flow.js')
+    const result = {
+      content: [
+        {
+          type: 'text',
+          text: '## Pages\n1: New Tab (chrome://new-tab-page/) [selected]\n7: Example Domain (https://example.com/)',
+        },
+      ],
+    }
+    assert.deepEqual(parseMcpPageList(result), [{ pageId: 1 }, { pageId: 7 }])
+  })
+
+  it('prefers structured content and never throws on junk', async () => {
+    const { parseMcpPageList } = await import('../dist/existing-flow.js')
+    assert.deepEqual(
+      parseMcpPageList({ structuredContent: { pages: [{ pageId: 3, url: 'https://x/' }] } }),
+      [{ pageId: 3, url: 'https://x/' }]
+    )
+    assert.deepEqual(parseMcpPageList(null), [])
+    assert.deepEqual(parseMcpPageList({ content: [{ type: 'text', text: 'no pages here' }] }), [])
+  })
+})
+
 describe('correlateNewPage', () => {
   it('returns the single new page id', () => {
     assert.equal(correlateNewPage([{ pageId: 1 }], [{ pageId: 1 }, { pageId: 2 }]), 2)

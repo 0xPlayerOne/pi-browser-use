@@ -46,6 +46,42 @@ export interface ExistingOpenResult {
   pageId?: number
 }
 
+/**
+ * Best-effort MCP page list → entries. Prefers structured content, then
+ * parses the `N: title (url)` text lines list_pages emits. Never throws:
+ * unparseable results yield an empty list (correlation then stays silent
+ * instead of guessing).
+ */
+export function parseMcpPageList(result: unknown): McpPageEntry[] {
+  const entries: McpPageEntry[] = []
+  if (typeof result !== 'object' || result === null) return entries
+  const structured = (result as { structuredContent?: unknown }).structuredContent
+  const candidates: unknown[] = Array.isArray(structured)
+    ? structured
+    : Array.isArray((structured as { pages?: unknown } | null)?.pages)
+      ? ((structured as { pages?: unknown[] }).pages as unknown[])
+      : []
+  for (const candidate of candidates) {
+    const entry = candidate as { pageId?: unknown; id?: unknown; url?: unknown }
+    const id = typeof entry.pageId === 'number' ? entry.pageId : entry.id
+    if (typeof id === 'number') {
+      entries.push(typeof entry.url === 'string' ? { pageId: id, url: entry.url } : { pageId: id })
+    }
+  }
+  if (entries.length > 0) return entries
+  const text = Array.isArray((result as { content?: unknown }).content)
+    ? (result as { content: Array<{ type?: unknown; text?: unknown }> }).content
+        .filter((item) => item.type === 'text' && typeof item.text === 'string')
+        .map((item) => item.text as string)
+        .join('\n')
+    : ''
+  for (const line of text.split('\n')) {
+    const match = line.match(/^\s*(\d+)\s*:/)
+    if (match) entries.push({ pageId: Number(match[1]) })
+  }
+  return entries
+}
+
 /** Diff page lists by id; returns the single new id, or undefined when the
  * diff is empty or ambiguous (never guess). */
 export function correlateNewPage(
