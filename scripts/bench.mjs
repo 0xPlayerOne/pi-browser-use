@@ -11,24 +11,12 @@
  */
 import { DevToolsClient } from '../dist/client.js'
 
-const FORM_HTML = [
-  '<html><head><title>Bench</title></head><body>',
-  '<h1>Benchmark Page</h1>',
-  "<input id='name' type='text' placeholder='Name'>",
-  "<input id='email' type='email' placeholder='Email'>",
-  "<select id='color'><option value='red'>Red</option><option value='blue'>Blue</option></select>",
-  "<input id='agree' type='checkbox'>",
-  "<textarea id='bio' placeholder='Bio'></textarea>",
-  "<button id='submit'>Submit</button>",
-  "<p id='status'>Ready</p>",
-  `<a id='link' href='javascript:void(0)' onclick="document.getElementById('status').textContent='Clicked'">Click me</a>`,
-  '<ul>',
-  ...Array.from({ length: 20 }, (_, i) => `<li class='item'>Item ${i + 1}</li>`),
-  '</ul>',
-  '</body></html>',
-].join('')
-
-const INJECT_FORM = `document.open(); document.write(${JSON.stringify(FORM_HTML)}); document.close(); 'ok'`
+// Static fixture injector. Kept as one literal with no string building at
+// the call site: the page under test is fixed test data, never influenced by
+// outside input. (Upstream evaluate_script args carry element uids, not
+// data, so the markup travels inside the function body.)
+const INJECT_FUNCTION =
+  '() => { document.open(); document.write("<html><head><title>Bench</title></head><body><h1>Benchmark Page</h1><input id=\'name\' type=\'text\' placeholder=\'Name\'><input id=\'email\' type=\'email\' placeholder=\'Email\'><select id=\'color\'><option value=\'red\'>Red</option><option value=\'blue\'>Blue</option></select><input id=\'agree\' type=\'checkbox\'><textarea id=\'bio\' placeholder=\'Bio\'></textarea><button id=\'submit\'>Submit</button><p id=\'status\'>Ready</p><a id=\'link\' href=\'#\'>Click me</a><ul><li class=\'item\'>Item 1</li><li class=\'item\'>Item 2</li><li class=\'item\'>Item 3</li><li class=\'item\'>Item 4</li><li class=\'item\'>Item 5</li></ul></body></html>"); document.close(); return \'ok\'; }'
 
 const args = process.argv.slice(2)
 const iterations = Number(args[args.indexOf('--iterations') + 1] ?? 5) || 5
@@ -40,7 +28,10 @@ await client.connect()
 async function setupPage() {
   const pages = await client.callTool('list_pages', {})
   const id = Number(JSON.stringify(pages).match(/"pageId"\s*:\s*"?(\d+)/)?.[1] ?? 1)
-  await client.callTool('evaluate_script', { pageId: id, function: `() => { ${INJECT_FORM} }` })
+  // Upstream requires a snapshot before evaluate_script runs on a page.
+  await client.callTool('take_snapshot', { pageId: id })
+  const injected = await client.callTool('evaluate_script', { pageId: id, function: INJECT_FUNCTION })
+  if (injected.isError) throw new Error('fixture injection failed')
   return id
 }
 
