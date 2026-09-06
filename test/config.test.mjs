@@ -3,11 +3,11 @@ import assert from 'node:assert/strict'
 import { configToArgs, resolveConfig } from '../dist/config.js'
 
 describe('resolveConfig', () => {
-  it('defaults to fresh headless isolated', () => {
+  it('defaults to persistent headless (Pi-owned profile)', () => {
     const resolved = resolveConfig({})
-    assert.equal(resolved.sessionMode, 'isolated')
+    assert.equal(resolved.sessionMode, 'persistent')
     assert.equal(resolved.headless, true)
-    assert.equal(resolved.isolated, true)
+    assert.match(resolved.userDataDir ?? '', /browser-profile$/)
     assert.equal(resolved.redactNetworkHeaders, true)
     assert.equal(resolved.usageStatistics, false)
   })
@@ -33,11 +33,18 @@ describe('resolveConfig', () => {
 })
 
 describe('configToArgs', () => {
-  it('emits headless + isolated by default', () => {
+  it('emits headless + Pi profile by default', () => {
     const args = configToArgs({})
     assert.ok(args.includes('--headless'))
-    assert.ok(args.includes('--isolated'))
+    assert.ok(args.some((a) => a.startsWith('--user-data-dir=')))
+    assert.ok(!args.includes('--isolated'))
     assert.ok(!args.includes('--auto-connect'))
+  })
+
+  it('fresh still buys an isolated clean room on request', () => {
+    const args = configToArgs({ mode: 'fresh' })
+    assert.ok(args.includes('--isolated'))
+    assert.ok(!args.some((a) => a.startsWith('--user-data-dir=')))
   })
 
   it('forwards chromeArgs as --chrome-arg', () => {

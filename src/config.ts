@@ -1,5 +1,6 @@
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { PI_PROFILE_NAME } from './named-profile.js'
 
 export const DEFAULT_PROFILE_DIR = join(homedir(), '.pi', 'browser-profile')
 
@@ -54,6 +55,8 @@ export interface BrowserUseConfig {
   allowedUrlPattern?: string[]
   blockedUrlPattern?: string[]
   slim?: boolean
+  /** Loopback port for the Existing-mode tab-broker bridge. Default 31973; set 0 to disable the bridge. */
+  tabBridgePort?: number
   /** First-class Chrome flags, forwarded as --chrome-arg=<flag>. Only applies when Chrome is launched by chrome-devtools-mcp (not with autoConnect/browserUrl). */
   chromeArgs?: string[]
   /** Raw escape hatch: extra CLI flags forwarded verbatim to chrome-devtools-mcp. */
@@ -61,13 +64,14 @@ export interface BrowserUseConfig {
 }
 
 /**
- * Fresh headless by default: isolated ephemeral profile, no window, never
- * steals focus. Set sessionMode "persistent" for the authenticated profile
- * (log in once, cookies persist), or "existing" + autoConnect to drive your
- * daily Chrome (intrusive: windows pop and steal focus).
+ * Persistent headless by default: Pi-owned profile, no window, never steals
+ * focus, no consent popups (log in once via browser_setup, cookies persist).
+ * Set sessionMode "isolated" (or mode "fresh") for an anonymous clean room,
+ * or "existing" + autoConnect to drive your daily Chrome (intrusive:
+ * consent popup every session, windows may pop and steal focus).
  */
 const DEFAULTS: BrowserUseConfig = {
-  sessionMode: 'isolated',
+  sessionMode: 'persistent',
   headless: true,
   categoryPerformance: false,
   categoryNetwork: true,
@@ -84,7 +88,7 @@ const DEFAULTS: BrowserUseConfig = {
 }
 
 /** In-session backend target for browser_switch_mode. */
-export type BrowserMode = 'fresh' | 'persistent'
+export type BrowserMode = 'fresh' | 'persistent' | 'existing'
 
 /**
  * Build the config for a mode switch from the session base config.
@@ -114,6 +118,15 @@ export function resolveModeTarget(
     const { userDataDir: _userDataDir, ...freshRest } = rest
     void _userDataDir
     return { ...freshRest, sessionMode: 'isolated', headless: !headed, isolated: true }
+  }
+  if (mode === 'existing') {
+    // Attach to the user's running Chrome: drop Pi-owned launch fields so
+    // MCP auto-connects instead of starting its own browser.
+    const { userDataDir: _userDataDir, isolated: _isolated, ...existingRest } = rest
+    void _userDataDir
+    void _isolated
+    // Existing attaches to the user's visible Chrome: always headed.
+    return { ...existingRest, sessionMode: 'existing', headless: false, autoConnect: true }
   }
   return {
     ...rest,
@@ -150,6 +163,11 @@ export function resolveConfig(config?: BrowserUseConfig): BrowserUseConfig {
     }
   } else if (headed !== undefined) {
     resolved.headless = !headed
+  }
+  // Existing attaches to the user's visible Chrome: always headed, so a
+  // stale headless default never leaks into flags or status output.
+  if (resolved.sessionMode === 'existing') {
+    resolved.headless = false
   }
   if (resolved.allowedUrlPattern?.length && resolved.blockedUrlPattern?.length) {
     throw new Error('allowedUrlPattern and blockedUrlPattern cannot be used together')
@@ -215,6 +233,15 @@ export function configToArgs(config: BrowserUseConfig): string[] {
   }
   for (const flag of resolved.chromeArgs ?? []) {
     args.push(`--chrome-arg=${flag}`)
+  }
+  if (
+    resolved.sessionMode === 'persistent' &&
+    !resolved.browserUrl &&
+    !resolved.wsEndpoint &&
+    !resolved.autoConnect
+  ) {
+    // MCP-launched persistent Chrome must use the same named Pi profile.
+    args.push(`--chrome-arg=--profile-directory=${PI_PROFILE_NAME}`)
   }
   if (resolved.extraArgs) args.push(...resolved.extraArgs)
   return args

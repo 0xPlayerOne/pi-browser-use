@@ -39,6 +39,7 @@
   },
   "files": [
     "dist",
+    "extension",
     "skills",
     "README.md"
   ],

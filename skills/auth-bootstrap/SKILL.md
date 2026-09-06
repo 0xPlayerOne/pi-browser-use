@@ -29,6 +29,19 @@ cp -R ~/Library/Application\ Support/Google/Chrome/Default ~/.pi/browser-profile
 
 Same macOS user, so Keychain-bound cookies and passwords decrypt fine. Prefer the headed-once flow unless you have dozens of logins — clones carry sync state, extensions, and version skew that cause strange breakage. Never copy while Chrome runs; you'll corrupt both ends.
 
+## Google SSO says "browser or app may not be secure"
+
+Expected: Google rejects sign-in from automation-driven Chrome
+(`--enable-automation`, debugging pipe, fresh profile with no history).
+Don't fight it — use one of these instead:
+
+1. **Email + password** on the login form (no Google involved).
+2. **Your daily browser**, which Google already trusts (real history, no
+   automation flags). Point the session at it temporarily with
+   `mode: existing` and drive the flow there, then switch back.
+3. Complete SSO there once; the persistent profile keeps the resulting
+   Cloudflare session cookies either way.
+
 ## What not to do
 
 - **Paste passwords or TOTP codes into chat.** The agent never needs them — type directly in the headed window.

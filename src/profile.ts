@@ -1,6 +1,7 @@
 import { accessSync, constants, renameSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { DEFAULT_PROFILE_DIR, type BrowserUseConfig } from './config.js'
+import { ensureNamedProfile } from './named-profile.js'
 
 function isRootOwned(path: string): boolean {
   try {
@@ -30,22 +31,23 @@ function isUnusableDir(path: string): boolean {
  * moved aside so Chrome starts fresh instead of showing a "can't read your
  * preferences" dialog on every launch. An explicit custom userDataDir in the
  * same state fails fast with a remediation hint instead of silently
- * discarding the user's data.
+ * discarding the user's data. Persistent launches additionally pin the named
+ * `pi-browser-use` profile (one-time legacy migration, refuses while an
+ * external Chrome holds the root).
  */
 export function prepareBrowserProfile(config: BrowserUseConfig): void {
-  if (config.browserUrl || config.wsEndpoint) return
+  if (config.browserUrl || config.wsEndpoint || config.autoConnect) return
   const dir =
     config.userDataDir ?? (config.sessionMode === 'persistent' ? DEFAULT_PROFILE_DIR : undefined)
-  if (!dir || dir !== DEFAULT_PROFILE_DIR) {
-    if (dir && isUnusableDir(dir)) {
+  if (!dir) return
+  if (dir !== DEFAULT_PROFILE_DIR) {
+    if (isUnusableDir(dir)) {
       throw new Error(
         `Browser profile at ${dir} is not accessible (likely root-owned from running under sudo). ` +
           `chown it back with: sudo chown -R $(id -un):$(id -gn) ${JSON.stringify(dir)}`
       )
     }
-    return
-  }
-  if (isUnusableDir(dir)) {
+  } else if (isUnusableDir(dir)) {
     const aside = join(dirname(DEFAULT_PROFILE_DIR), `browser-profile.inaccessible-${Date.now()}`)
     console.error(
       `[pi-browser-use] default browser profile is inaccessible; moving it aside to ${aside} and starting fresh.`
@@ -58,5 +60,10 @@ export function prepareBrowserProfile(config: BrowserUseConfig): void {
           `Fix ownership with: sudo chown -R $(id -un):$(id -gn) ${JSON.stringify(dir)}`
       )
     }
+  }
+  // Pin the named Pi profile for persistent launches (fresh migrations
+  // happen here, under no running Chrome by construction of the callers).
+  if (config.sessionMode === 'persistent') {
+    ensureNamedProfile(dir)
   }
 }

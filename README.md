@@ -4,10 +4,11 @@ Opinionated browser-use for the [Pi coding agent](https://pi.dev), powered by [`
 
 ## Why this exists
 
-- **Fresh headless by default** — isolated ephemeral profile, no window, never steals focus.
-- **Authenticated profile opt-in** — `sessionMode: persistent` persists `~/.pi/browser-profile` (log in once).
+- **Persistent Pi browser by default** — self-launched headless Chrome on `~/.pi/browser-profile` (log in once via `browser_setup`); MCP attaches over an ephemeral loopback port. No window, no focus steal, no consent popups.
+- **Fresh clean room on request** — `mode: fresh` for anonymous checks; nothing persists.
+- **Existing-Chrome escape hatch** — `mode: existing` brokers background tabs into the collapsed `pi-browser-use` group via the bundled extension (`extension/`).
 - **CLI-first policy bundled** — `skills/browser-policy` tells agents to prefer `gh` / `wrangler` / APIs and web fetching before driving the browser.
-- **Safer proxying** — `browser_`-prefixed tools, noisy/privileged tools excluded, sensitive network headers redacted.
+- **Safer proxying** — `browser_`-prefixed tools, noisy/privileged tools excluded, sensitive network headers redacted, background/focus-safe page defaults.
 
 Not affiliated with `@amaster.ai/pi-browser-use` or `@narumitw/pi-chrome-devtools`.
 
@@ -26,18 +27,20 @@ Settings key is `pi-browser-use` in `~/.pi/agent/settings.json` (user) or `.pi/s
 ```json
 {
   "pi-browser-use": {
-    "mode": "fresh",
+    "mode": "persistent",
     "headed": false,
     "visionModel": { "provider": "openai", "model": "gpt-4o" }
   }
 }
 ```
 
-| `mode`            | Behavior                                                    |
-| ----------------- | ----------------------------------------------------------- |
-| `fresh` (default) | Isolated clean room, thrown away each session               |
-| `persistent`      | Saved profile with your logins (`~/.pi/browser-profile`)    |
-| `existing`        | Attach to your running Chrome — intrusive, avoid by default |
+`persistent` is already the default; the snippet above pins it explicitly. There is no consent popup in this mode — Chrome's per-session "Allow remote debugging?" gate applies to `existing` only.
+
+| `mode`                 | Behavior                                                                     |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| `persistent` (default) | Pi's own browser: saved profile with your logins (`~/.pi/browser-profile`)   |
+| `fresh`                | Isolated clean room, thrown away each session                                |
+| `existing`             | Attach to your running Chrome — consent popup each session, avoid by default |
 
 `headed: true` shows the window (both modes default headless); `existing` is always headed. `visionModel` enables `browser_analyze_screenshot`; omit it and the tool stays unregistered.
 
@@ -68,6 +71,7 @@ Per-project identity composes: user settings set the default, trusted project se
 | `viewport`             | `string`   | —          | Initial viewport, e.g. `1280x720`                                              |
 | `userDataDir`          | `string`   | —          | Custom profile dir (persistent mode defaults to `~/.pi/browser-profile`)       |
 | `autoConnect`          | `boolean`  | `false`    | Auto-attach to a local running Chrome (implies `existing`)                     |
+| `tabBridgePort`        | `number`   | `31973`    | Loopback port for the Existing-mode tab-broker bridge (`0` disables it)        |
 | `chromeArgs`           | `string[]` | —          | First-class Chrome flags, forwarded as `--chrome-arg=`                         |
 | `extraArgs`            | `string[]` | —          | Raw escape hatch, forwarded verbatim to `chrome-devtools-mcp`                  |
 | `visionModel`          | `object`   | —          | `{ provider, model }` from Pi's registry; enables `browser_analyze_screenshot` |
@@ -81,6 +85,8 @@ Per-project identity composes: user settings set the default, trusted project se
 First-class `chromeArgs` only apply when `chrome-devtools-mcp` launches Chrome itself — never with `autoConnect`/`browserUrl`. On macOS `--start-minimized` is ignored; only `headless: true` truly hides the window.
 
 Hosts where `process.execPath` is not a directly executable Node runtime can set `PI_BROWSER_USE_NODE` to the Node command used for the MCP subprocess.
+
+Persistent mode self-launches Pi-owned Chrome and attaches MCP via `browserUrl`. Set `PI_BROWSER_USE_LEGACY_PERSISTENT=1` to restore the pre-Phase-2 behavior (MCP launches Chrome itself).
 
 ## Tools
 
@@ -105,11 +111,27 @@ browser_save_artifact({ "pageId": 1, "kind": "screenshot", "annotate": true })
 
 ### `browser_switch_mode`
 
-Switch backends without restarting: `fresh` (isolated clean room) or `persistent` (saved profile with your logins). Both default to headless — pass `headed: true` to watch. Tabs do not transfer; call `browser_list_pages` after switching. Prefer fresh; escalate to persistent only on login walls.
+Switch backends without restarting: `fresh` (isolated clean room), `persistent` (Pi-owned Chrome on the saved profile with your logins), or `existing` (attach to your running Chrome). Fresh and persistent default to headless — pass `headed: true` to watch. Tabs do not transfer; call `browser_list_pages` after switching. Prefer fresh; escalate to persistent only on login walls. `rememberSite: true` pins the last-visited site's visibility (headless vs headed-background) for next time.
+
+### `browser_setup`
+
+First-run setup for the persistent profile: opens a plain headed Chrome window (no automation attached) for a human to sign in, and completes when the window closes. If the profile is already initialized it says so and points at `browser_reauth` instead.
+
+### `browser_status`
+
+Plain-language status — profile readiness, execution mode, next step — without touching any page. Bootstrap initializes the profile; it never proves a site session.
+
+### `browser_reauth`
+
+Reauthenticate the persistent profile: shuts headless Chrome down cleanly, opens a headed window for the human to verify, then resumes headless. `variant: plain` opens a dependency-free window for providers that reject instrumented browsers.
+
+### `browser_open_background_tab`
+
+Existing mode only: opens a URL as an inactive tab in the collapsed `pi-browser-use` group via the Pi extension (see `extension/`). Fails clearly when the extension bridge is unavailable — never a foreground tab.
 
 ### `browser_doctor`
 
-Self-diagnostics: effective mode, whether this session launches its own Chrome, profile health, and upstream tool availability. Run it first when browser tools misbehave — it touches no pages.
+Self-diagnostics: effective mode, backend ownership (Pi-owned vs MCP-launched vs attached), profile health, tab-bridge URL, and upstream tool availability. Run it first when browser tools misbehave — it touches no pages.
 
 ### `browser_analyze_screenshot`
 
@@ -129,6 +151,8 @@ Call `browser_list_pages` first, then pass its numeric `pageId` to page-scoped t
 
 ## Browser profile
 
+The persistent browser lives in a Chrome profile directory named `pi-browser-use` inside `~/.pi/browser-profile` (one-time automatic migration from legacy `Default`/`Profile 1` layouts while Chrome is stopped), so Pi's cookies and logins are always distinguishable on disk from anything else.
+
 On startup the default persistent profile is checked for accessibility. A root-owned or unreadable default (typically from running under `sudo`) is moved aside to `~/.pi/browser-profile.inaccessible-<timestamp>` so Chrome starts fresh instead of showing a preferences dialog. An explicit custom `userDataDir` in the same state fails fast with an ownership remediation hint. Never run the agent (or anything launching this browser) via `sudo`.
 
 ## Performance
@@ -138,6 +162,8 @@ On startup the default persistent profile is checked for accessibility. A root-o
 ## Bundled skills
 
 - `browser-policy` — CLI-first decision order, session modes, bot-wall and safety rules.
+- `gmail-auth` — Gmail inbox verification, challenge handling, headless/headed pinning.
+- `auth-bootstrap` — first-run login flow for the persistent profile.
 - `playwright-handoff` — when to stop clicking and run a repo Playwright spec instead (npm-first, bun alternatives, no repo changes required).
 - `triage-console` — snapshot → console errors → failed network → screenshot.
 - `visual-qa` — viewport matrix and canvas/WebGL discipline, including the annotate flow.
@@ -154,6 +180,8 @@ On startup the default persistent profile is checked for accessibility. A root-o
 | `profile is already in use`        | Two sessions sharing one `userDataDir`                                                  | Use isolated mode or separate dirs per session                                       |
 | Stale uid errors                   | Page re-rendered after your snapshot                                                    | Take a fresh snapshot; ids invalidate on every action                                |
 | Vision tool missing                | No `visionModel` configured                                                             | Add it; otherwise use tree uids, or the global `vision` skill for vision-less models |
+| "Allow remote debugging?" popup    | Chrome 144+ consent gate for MCP auto-attach in Existing mode                           | Click Allow (once per Pi session); persistent mode never triggers it                 |
+| Pi tab closed the wrong tab        | Page IDs shift when tabs close — fixed                                                  | Existing `close_page` now refuses tabs Pi didn't open unless `force: true`           |
 
 ## License
 
