@@ -86,6 +86,10 @@ browser_save_artifact({ "pageId": 1, "kind": "screenshot", "annotate": true })
 # 6: (394, 298) button "Create workspace"
 ```
 
+### `browser_switch_mode`
+
+Switch backends without restarting: `fresh` (isolated headless clean room) or `auth` (persistent profile with your logins, headless by default — pass `headed: true` to watch). Tabs do not transfer; call `browser_list_pages` after switching. Prefer fresh; escalate to auth only on login walls.
+
 ### `browser_doctor`
 
 Self-diagnostics: effective mode, whether this session launches its own Chrome, profile health, and upstream tool availability. Run it first when browser tools misbehave — it touches no pages.

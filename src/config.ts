@@ -69,6 +69,43 @@ const DEFAULTS: BrowserUseConfig = {
   acceptInsecureCerts: false,
 }
 
+/** In-session backend target for browser_switch_mode. */
+export type BrowserMode = 'fresh' | 'auth'
+
+/**
+ * Build the config for a mode switch from the session base config.
+ * fresh always means an isolated headless clean room; auth means the
+ * persistent profile (headless unless headed is requested, so logins work
+ * without popups). Attach fields never carry across modes.
+ */
+export function resolveModeTarget(
+  base: BrowserUseConfig,
+  mode: BrowserMode,
+  headed = false
+): BrowserUseConfig {
+  const {
+    browserUrl: _browserUrl,
+    wsEndpoint: _wsEndpoint,
+    autoConnect: _autoConnect,
+    ...rest
+  } = base
+  void _browserUrl
+  void _wsEndpoint
+  void _autoConnect
+  if (mode === 'fresh') {
+    const { userDataDir: _userDataDir, ...freshRest } = rest
+    void _userDataDir
+    return { ...freshRest, sessionMode: 'isolated', headless: true, isolated: true }
+  }
+  return {
+    ...rest,
+    sessionMode: 'persistent',
+    headless: !headed,
+    isolated: false,
+    userDataDir: base.userDataDir ?? DEFAULT_PROFILE_DIR,
+  }
+}
+
 /** Merge user config over fresh-headless defaults. */
 export function resolveConfig(config?: BrowserUseConfig): BrowserUseConfig {
   const resolved: BrowserUseConfig = { ...DEFAULTS, ...config }

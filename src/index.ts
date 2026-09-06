@@ -3,7 +3,12 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { Type, type TSchema } from 'typebox'
 import { DevToolsClient } from './client.js'
-import { resolveConfig, type BrowserUseConfig } from './config.js'
+import {
+  resolveConfig,
+  resolveModeTarget,
+  type BrowserMode,
+  type BrowserUseConfig,
+} from './config.js'
 import { isProjectTrusted, loadConfig } from './settings.js'
 import {
   augmentToolDescription,
@@ -294,6 +299,52 @@ export default function browserUseExtension(pi: Pi) {
     })
   }
 
+  function registerSwitchModeTool() {
+    pi.registerTool({
+      name: `${TOOL_PREFIX}switch_mode`,
+      label: `${TOOL_PREFIX}switch_mode`,
+      description:
+        'Switch the browser backend without restarting: "fresh" is an isolated headless clean room, "auth" is the persistent profile with your logins. Tabs do not transfer; call browser_list_pages after switching. Prefer fresh; escalate to auth only on login walls.',
+      parameters: Type.Object({
+        mode: Type.Union([Type.Literal('fresh'), Type.Literal('auth')]),
+        headed: Type.Optional(
+          Type.Boolean({
+            description:
+              'Auth mode only: show the browser window. Default is headless — logins still work with no popups.',
+          })
+        ),
+      }),
+      async execute(_toolCallId, params, signal) {
+        const mode: BrowserMode = params.mode === 'auth' ? 'auth' : 'fresh'
+        const next = resolveConfig(resolveModeTarget(config ?? {}, mode, params.headed === true))
+        if (client) {
+          try {
+            await client.close()
+          } catch {
+            // A half-dead transport must not block the switch.
+          }
+          client = undefined
+        }
+        prepareBrowserProfile(next)
+        client = new DevToolsClient(next)
+        await client.ensureReady(signal)
+        config = next
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                mode === 'fresh'
+                  ? 'Switched to a fresh isolated headless browser. Previous tabs are gone; call browser_list_pages to start.'
+                  : `Switched to the persistent authenticated profile (${next.headless === false ? 'headed' : 'headless'}). Previous tabs are gone; call browser_list_pages to start.`,
+            },
+          ],
+          details: undefined,
+        }
+      },
+    })
+  }
+
   function registerDoctorTool() {
     pi.registerTool({
       name: `${TOOL_PREFIX}doctor`,
@@ -357,6 +408,7 @@ export default function browserUseExtension(pi: Pi) {
     await registerUpstreamTools()
     registerSaveArtifactTool()
     registerDoctorTool()
+    registerSwitchModeTool()
     if (config.visionModel) {
       await registerVisionTool(config.visionModel)
     }
