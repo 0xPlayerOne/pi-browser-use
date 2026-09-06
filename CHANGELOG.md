@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.3.3...pi-browser-use-v0.4.0) (2026-09-06)
+
+
+### Features
+
+* annotated screenshots, doctor diagnostics, and benchmark harness ([f27629a](https://github.com/0xPlayerOne/pi-browser-use/commit/f27629a2d99a84f2be9e3176b169aca837030fab))
+
 ## [0.3.3](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.3.2...pi-browser-use-v0.3.3) (2026-09-06)
 
 
