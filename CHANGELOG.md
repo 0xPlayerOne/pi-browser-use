@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.4.1...pi-browser-use-v0.4.2) (2026-09-06)
+
+
+### Bug Fixes
+
+* **security:** static bench fixture instead of composed evaluate string ([15583ba](https://github.com/0xPlayerOne/pi-browser-use/commit/15583ba81bcd437ac918cba24bd67e65d5047204))
+
 ## [0.4.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.4.0...pi-browser-use-v0.4.1) (2026-09-06)
 
 
