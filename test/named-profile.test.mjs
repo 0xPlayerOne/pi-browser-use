@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ensureNamedProfile, isChromeRunningOn, PI_PROFILE_NAME } from '../dist/named-profile.js'
@@ -64,5 +64,53 @@ describe('named profile', () => {
 
   it('isChromeRunningOn is false for a quiet root', () => {
     assert.equal(isChromeRunningOn(dir), false)
+  })
+})
+
+describe('seedDisplayName', () => {
+  let dir
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'pi-seed-'))
+  })
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('seeds a fresh profile directory with the Pi name', async () => {
+    const { seedDisplayName, PI_PROFILE_DISPLAY_NAME } = await import('../dist/named-profile.js')
+    const target = join(dir, 'pi-browser-use')
+    assert.equal(seedDisplayName(target), true)
+    const prefs = JSON.parse(readFileSync(join(target, 'Preferences'), 'utf8'))
+    assert.equal(prefs.profile.name, PI_PROFILE_DISPLAY_NAME)
+  })
+
+  it('replaces generic Chrome-assigned names', async () => {
+    const { seedDisplayName, PI_PROFILE_DISPLAY_NAME } = await import('../dist/named-profile.js')
+    const target = join(dir, 'pi-browser-use')
+    mkdirSync(target, { recursive: true })
+    for (const generic of ['Person 1', 'Your Chrome', '']) {
+      writeFileSync(join(target, 'Preferences'), JSON.stringify({ profile: { name: generic } }))
+      assert.equal(seedDisplayName(target), true)
+      const prefs = JSON.parse(readFileSync(join(target, 'Preferences'), 'utf8'))
+      assert.equal(prefs.profile.name, PI_PROFILE_DISPLAY_NAME)
+    }
+  })
+
+  it('preserves a custom user-chosen name', async () => {
+    const { seedDisplayName } = await import('../dist/named-profile.js')
+    const target = join(dir, 'pi-browser-use')
+    mkdirSync(target, { recursive: true })
+    writeFileSync(join(target, 'Preferences'), JSON.stringify({ profile: { name: 'Work' } }))
+    assert.equal(seedDisplayName(target), false)
+    const prefs = JSON.parse(readFileSync(join(target, 'Preferences'), 'utf8'))
+    assert.equal(prefs.profile.name, 'Work')
+  })
+
+  it('leaves corrupt Preferences alone', async () => {
+    const { seedDisplayName } = await import('../dist/named-profile.js')
+    const target = join(dir, 'pi-browser-use')
+    mkdirSync(target, { recursive: true })
+    writeFileSync(join(target, 'Preferences'), 'not-json{{{')
+    assert.equal(seedDisplayName(target), false)
   })
 })

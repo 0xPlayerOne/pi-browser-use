@@ -110,6 +110,24 @@ describe('PersistentBackend', () => {
     }
   })
 
+  it('infers headed from config when the option is omitted', async () => {
+    const seen = []
+    const backend = new PersistentBackend({
+      config: { sessionMode: 'persistent', headless: false, userDataDir: dir },
+      launch: async (options) => {
+        seen.push(options)
+        return makeChrome()
+      },
+      lock: () => makeLock(),
+    })
+    await backend.start()
+    try {
+      assert.equal(seen[0].headless, false)
+    } finally {
+      await backend.stop()
+    }
+  })
+
   it('start is idempotent while running', async () => {
     let launches = 0
     const backend = new PersistentBackend({

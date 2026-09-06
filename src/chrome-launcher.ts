@@ -244,6 +244,28 @@ export async function launchChrome(options: ChromeLaunchOptions): Promise<Chrome
 }
 
 /**
+ * AppleScript that raises the Chrome window holding the marker URL.
+ * Pure (testable): execution lives with the caller. Foreground is reserved
+ * for explicit user-requested views and auth handoffs — never automation.
+ */
+export function buildFocusWindowScript(markerUrl: string): string {
+  const needle = markerUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  return [
+    'tell application "Google Chrome"',
+    'activate',
+    'repeat with w in every window',
+    'repeat with t in every tab of w',
+    `if (URL of t starts with "${needle}") then`,
+    'set index of w to 1',
+    'exit repeat',
+    'end if',
+    'end repeat',
+    'end repeat',
+    'end tell',
+  ].join('\n')
+}
+
+/**
  * Launch the headed first-run/setup browser (spec section 3): same Pi
  * profile, no MCP, no Puppeteer, no remote debugging — an ordinary manually
  * launched Chrome. Resolves when the user closes the window.

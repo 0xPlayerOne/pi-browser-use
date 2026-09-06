@@ -20,10 +20,52 @@
  * `last_used` pointer can never resurrect the old directory.
  */
 
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 export const PI_PROFILE_NAME = 'pi-browser-use'
+
+/** Human-visible name in Chrome's profile menu/picker. */
+export const PI_PROFILE_DISPLAY_NAME = 'Pi Browser'
+
+/** Generic Chrome-assigned names worth replacing with ours. */
+const GENERIC_PROFILE_NAMES = [/^person \d+$/i, /^your chrome$/i, /^default$/i]
+
+function isGenericName(name: unknown): boolean {
+  if (typeof name !== 'string' || name.trim().length === 0) return true
+  return GENERIC_PROFILE_NAMES.some((pattern) => pattern.test(name.trim()))
+}
+
+/**
+ * Stamp the display name on a profile directory's Preferences (best effort,
+ * Chrome stopped only). Fresh directories get a minimal Preferences file
+ * that Chrome backfills on launch; custom user-chosen names are preserved.
+ */
+export function seedDisplayName(profileDir: string): boolean {
+  try {
+    mkdirSync(profileDir, { recursive: true })
+  } catch {
+    return false
+  }
+  const path = join(profileDir, 'Preferences')
+  try {
+    const raw = readFileSync(path, 'utf8')
+    const prefs = JSON.parse(raw) as { profile?: Record<string, unknown> }
+    const current = (prefs.profile ?? {}).name
+    if (!isGenericName(current)) return false
+    prefs.profile = { ...(prefs.profile ?? {}), name: PI_PROFILE_DISPLAY_NAME }
+    writeFileSync(path, JSON.stringify(prefs))
+    return true
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return false
+    try {
+      writeFileSync(path, JSON.stringify({ profile: { name: PI_PROFILE_DISPLAY_NAME } }))
+      return true
+    } catch {
+      return false
+    }
+  }
+}
 
 /** Chrome singleton markers: present while any Chrome holds the root. */
 const SINGLETON_FILES = ['SingletonSocket', 'SingletonLock', 'SingletonCookie']
@@ -73,14 +115,21 @@ export interface NamedProfile {
  */
 export function ensureNamedProfile(root: string): NamedProfile {
   const target = join(root, PI_PROFILE_NAME)
-  if (existsSync(target)) return { root, name: PI_PROFILE_NAME, migratedFrom: null }
+  if (existsSync(target)) {
+    seedDisplayName(target)
+    return { root, name: PI_PROFILE_NAME, migratedFrom: null }
+  }
 
   const candidates = [readLastUsed(root), 'Default', 'Profile 1'].filter(
     (name): name is string => typeof name === 'string'
   )
   const source = candidates.find((name) => existsSync(join(root, name)))
 
-  if (!source) return { root, name: PI_PROFILE_NAME, migratedFrom: null }
+  if (!source) {
+    // Fresh root: seed the name now so Chrome is born Pi-branded.
+    seedDisplayName(target)
+    return { root, name: PI_PROFILE_NAME, migratedFrom: null }
+  }
   if (isChromeRunningOn(root)) {
     throw new Error(
       `Chrome is running on ${root}: refusing to migrate ${source} to ${PI_PROFILE_NAME} while the profile is live.`
@@ -88,5 +137,6 @@ export function ensureNamedProfile(root: string): NamedProfile {
   }
   renameSync(join(root, source), target)
   writeLastUsed(root, PI_PROFILE_NAME)
+  seedDisplayName(target)
   return { root, name: PI_PROFILE_NAME, migratedFrom: source }
 }

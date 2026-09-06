@@ -88,10 +88,13 @@ export class PersistentBackend {
     try {
       // Pin the named Pi profile; migrate legacy layouts once, under lock.
       ensureNamedProfile(profileDir)
+      // Explicit headed wins; otherwise infer from config (headless:false
+      // means headed) so direct construction can't silently go headless.
+      const headed = this.options.headed ?? this.options.config.headless === false
       this.chrome = await this.launch({
         userDataDir: profileDir,
         profileDirectory: PI_PROFILE_NAME,
-        headless: !(this.options.headed ?? false),
+        headless: !headed,
         chromeArgs: this.options.config.chromeArgs,
         executablePath: this.options.config.executablePath,
       })
