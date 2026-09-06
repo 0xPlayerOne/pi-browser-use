@@ -55,6 +55,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build",
+    "bench": "node scripts/bench.mjs",
     "test": "node --test test/*.test.mjs",
     "pretest": "npm run build"
   },

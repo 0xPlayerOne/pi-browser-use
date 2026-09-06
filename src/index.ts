@@ -13,6 +13,13 @@ import {
   postProcessToolResult,
 } from './tool-augment.js'
 import { pickImageData, resolveArtifactTarget, type ArtifactKind } from './artifacts.js'
+import {
+  CLEANUP_ANNOTATIONS,
+  formatAnnotatedMap,
+  INJECT_ANNOTATIONS,
+  parseAnnotatedElements,
+} from './annotate.js'
+import { diagnose, formatDoctorReport } from './doctor.js'
 import { prepareBrowserProfile } from './profile.js'
 import {
   createRegistryVisionCaller,
@@ -190,6 +197,12 @@ export default function browserUseExtension(pi: Pi) {
             'Absolute destination path. Defaults to ~/.pi/browser-artifacts/<timestamp>.<png|html>.',
         })
       ),
+      annotate: Type.Optional(
+        Type.Boolean({
+          description:
+            'Screenshots only: overlay numbered badges on interactive elements and return their coordinate map for coordinate click tools. Badges are removed after capture.',
+        })
+      ),
     }
     if (config?.experimentalPageIdRouting === true) {
       properties.pageId = Type.Number({
@@ -230,15 +243,70 @@ export default function browserUseExtension(pi: Pi) {
           }
         }
         const shotArgs = pageId === undefined ? {} : { pageId }
-        const shot = (await browser.callTool('take_screenshot', shotArgs, signal)) as UpstreamResult
-        const image = pickImageData(shot.content)
-        if (!image) throw new Error('Screenshot came back without image data.')
-        mkdirSync(dirname(target), { recursive: true })
-        writeFileSync(target, Buffer.from(image.data, 'base64'))
+        const evalArgs = pageId === undefined ? {} : { pageId }
+        const wantAnnotations = params.annotate === true && kind === 'screenshot'
+        let annotatedMap = ''
+        try {
+          if (wantAnnotations) {
+            const injected = (await browser.callTool(
+              'evaluate_script',
+              {
+                ...evalArgs,
+                function: INJECT_ANNOTATIONS,
+              },
+              signal
+            )) as UpstreamResult
+            annotatedMap = formatAnnotatedMap(
+              parseAnnotatedElements(extractTextContent(injected.content))
+            )
+          }
+          const shot = (await browser.callTool(
+            'take_screenshot',
+            shotArgs,
+            signal
+          )) as UpstreamResult
+          const image = pickImageData(shot.content)
+          if (!image) throw new Error('Screenshot came back without image data.')
+          mkdirSync(dirname(target), { recursive: true })
+          writeFileSync(target, Buffer.from(image.data, 'base64'))
+        } finally {
+          if (wantAnnotations) {
+            try {
+              await browser.callTool(
+                'evaluate_script',
+                {
+                  ...evalArgs,
+                  function: CLEANUP_ANNOTATIONS,
+                },
+                signal
+              )
+            } catch {
+              // Badges are pointer-events:none and harmless if cleanup fails.
+            }
+          }
+        }
+        const suffix = annotatedMap ? `\nAnnotated elements:\n${annotatedMap}` : ''
         return {
-          content: [{ type: 'text', text: `Saved screenshot to ${target}` }],
+          content: [{ type: 'text', text: `Saved screenshot to ${target}${suffix}` }],
           details: undefined,
         }
+      },
+    })
+  }
+
+  function registerDoctorTool() {
+    pi.registerTool({
+      name: `${TOOL_PREFIX}doctor`,
+      label: `${TOOL_PREFIX}doctor`,
+      description:
+        'Diagnose the browser setup: effective mode, whether this session launches its own Chrome, profile health, and upstream tool availability. Run this first when browser tools misbehave. Touches no pages.',
+      parameters: Type.Object({}),
+      async execute() {
+        await ensureConnected()
+        const report = await diagnose(config ?? {}, async () =>
+          (await client!.listAllTools()).map((tool) => tool.name)
+        )
+        return { content: [{ type: 'text', text: formatDoctorReport(report) }], details: undefined }
       },
     })
   }
@@ -288,6 +356,7 @@ export default function browserUseExtension(pi: Pi) {
     client = new DevToolsClient(config)
     await registerUpstreamTools()
     registerSaveArtifactTool()
+    registerDoctorTool()
     if (config.visionModel) {
       await registerVisionTool(config.visionModel)
     }

@@ -50,6 +50,10 @@ Call `browser_list_pages` first, then pass its numeric `pageId` to page-scoped t
 
 `browser_save_artifact` writes a screenshot or the rendered HTML to disk (default `~/.pi/browser-artifacts/`) and returns the path. Prefer it over inline captures for evidence, visual QA, and artifact sharing.
 
+## Performance
+
+`npm run bench` times the tool stack headless over 5 iterations (fixture setup excluded, matching vercel-labs/agent-browser's scenario set). Baseline on Apple Silicon: navigate ~1ms, snapshot ~3ms, screenshot ~37ms, evaluate ~206ms, full agent-loop cycle ~422ms. Re-run on your hardware before quoting numbers.
+
 ## Bundled skills
 
 - `browser-policy` — CLI-first decision order, session modes, bot-wall and safety rules.
