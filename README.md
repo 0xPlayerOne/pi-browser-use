@@ -125,7 +125,7 @@ Vision analysis for canvas/WebGL scenes and coordinate clicks the accessibility 
 
 ## Page-scoped tools
 
-Call `browser_list_pages` first, then pass its numeric `pageId` to page-scoped tools. Click-family calls blocked by an overlay are retried once automatically after dismissing it with Escape; stale element references get a refresh hint. See `skills/browser-policy/SKILL.md` for the full agent policy.
+Call `browser_list_pages` first, then pass its numeric `pageId` to page-scoped tools. Click-family calls blocked by an overlay are retried once automatically after dismissing it with Escape; stale element references get a refresh hint. Hard blocks escalate on their own: login walls in a fresh session suggest the switch call, while login walls and bot challenges in an authenticated session rebuild headed and prompt the human — once per call, never looping. See `skills/browser-policy/SKILL.md` for the full agent policy.
 
 ## Browser profile
 

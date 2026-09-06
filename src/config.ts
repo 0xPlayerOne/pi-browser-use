@@ -101,11 +101,15 @@ export function resolveModeTarget(
     browserUrl: _browserUrl,
     wsEndpoint: _wsEndpoint,
     autoConnect: _autoConnect,
+    mode: _mode,
+    headed: _headed,
     ...rest
   } = base
   void _browserUrl
   void _wsEndpoint
   void _autoConnect
+  void _mode
+  void _headed
   if (mode === 'fresh') {
     const { userDataDir: _userDataDir, ...freshRest } = rest
     void _userDataDir

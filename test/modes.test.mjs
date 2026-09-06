@@ -23,6 +23,13 @@ describe('resolveModeTarget', () => {
     assert.equal(next.viewport, '1280x720')
   })
 
+  it('drops one-shot mode directives so re-resolve is stable', () => {
+    const once = resolveModeTarget({ mode: 'persistent', headed: true }, 'fresh')
+    assert.equal(once.mode, undefined)
+    assert.equal(once.headed, undefined)
+    assert.equal(once.sessionMode, 'isolated')
+  })
+
   it('fresh honors an explicit headed request', () => {
     const next = resolveModeTarget({ sessionMode: 'persistent' }, 'fresh', true)
     assert.equal(next.sessionMode, 'isolated')

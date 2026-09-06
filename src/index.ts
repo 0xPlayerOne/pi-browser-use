@@ -12,6 +12,7 @@ import {
 import { isProjectTrusted, loadConfig } from './settings.js'
 import {
   augmentToolDescription,
+  classifyPageState,
   extractTextContent,
   looksLikeLoginWall,
   looksOverlayBlocked,
@@ -154,10 +155,78 @@ export default function browserUseExtension(pi: Pi) {
     return 'custom'
   }
 
+  /**
+   * Rebuild the backend for a mode switch. Shared by the switch tool and
+   * automatic escalation so both paths behave identically.
+   */
+  async function switchBackend(mode: BrowserMode, headed: boolean, signal?: AbortSignal) {
+    const next = resolveConfig(resolveModeTarget(config ?? {}, mode, headed))
+    if (client) {
+      try {
+        await client.close()
+      } catch {
+        // A half-dead transport must not block the switch.
+      }
+      client = undefined
+    }
+    prepareBrowserProfile(next)
+    client = new DevToolsClient(next)
+    await client.ensureReady(signal)
+    config = next
+    currentMode = mode
+    return next
+  }
+
   function loginWallHint(url: string | undefined, text: string): string {
     if (currentMode !== 'fresh') return ''
     if (!looksLikeLoginWall(url, text)) return ''
     return '\n\nHint: this looks like a login wall in a fresh (logged-out) session. If the page needs your identity, call browser_switch_mode({"mode": "persistent"}) — a human must complete any SSO, 2FA, or passkey step, ideally headed.'
+  }
+
+  /**
+   * Automatic escalation for hard blocks the agent cannot clear alone.
+   * Returns prompt text for the agent to relay, or empty when nothing
+   * applies. Escalates at most once per call; never loops, never retries
+   * a challenge page, and never switches away from an attached session.
+   */
+  async function escalateBlockedPage(
+    url: string | undefined,
+    text: string,
+    signal?: AbortSignal
+  ): Promise<string> {
+    const state = classifyPageState(url, text)
+    if (state === 'ok') return ''
+    if (state === 'login-wall') {
+      if (currentMode === 'fresh') return loginWallHint(url, text)
+      if (currentMode === 'custom') {
+        return '\n\nThis page needs an identity this session does not have. Sign in is required — complete it in the visible browser, then retry.'
+      }
+      return await escalateToHeaded(url ?? 'this page')
+    }
+    // Challenge (bot check): identity never helps; only a human-gated
+    // headed window can clear it. Stay in the same mode.
+    if (config?.headless === false) {
+      return '\n\nA bot challenge is blocking this page and the browser is already visible. Complete the challenge in the window, then retry.'
+    }
+    if (currentMode === 'custom') {
+      return '\n\nA bot challenge is blocking this page. Complete it in the visible browser, then retry — do not loop against the challenge.'
+    }
+    return await escalateToHeaded(url ?? 'this page')
+  }
+
+  /**
+   * Rebuild the current backend headed so a human can act (log in, clear
+   * a challenge), then tell the agent exactly what to relay. Attach
+   * sessions are already visible and owned by the user: prompt only.
+   */
+  async function escalateToHeaded(url: string, signal?: AbortSignal): Promise<string> {
+    const mode: BrowserMode = currentMode === 'persistent' ? 'persistent' : 'fresh'
+    try {
+      await switchBackend(mode, true, signal)
+    } catch (error) {
+      return `\n\nBlocked on ${url} and the headed browser failed to launch (${error instanceof Error ? error.message : String(error)}). Ask the user to proceed manually.`
+    }
+    return `\n\nBlocked on ${url}: a browser window just opened (same ${mode} session — previous tabs are gone, re-list pages after). Please complete the login or challenge in that window, then tell the agent to continue. Do not close the window until done.`
   }
 
   function pageUrlFromSnapshot(text: string): string | undefined {
@@ -214,10 +283,14 @@ export default function browserUseExtension(pi: Pi) {
               originalName === 'navigate_page' && typeof params.url === 'string'
                 ? params.url
                 : pageUrlFromSnapshot(extractTextContent(result.content))
-            const hint = loginWallHint(url, extractTextContent(result.content))
+            const escalation = await escalateBlockedPage(
+              url,
+              extractTextContent(result.content),
+              signal
+            )
             const first = toolContent.content[0]
-            if (hint && first && first.text !== undefined) {
-              first.text += hint
+            if (escalation && first && first.text !== undefined) {
+              first.text += escalation
             }
           }
           return { ...toolContent, details: undefined }
@@ -351,20 +424,7 @@ export default function browserUseExtension(pi: Pi) {
       }),
       async execute(_toolCallId, params, signal) {
         const mode: BrowserMode = params.mode === 'persistent' ? 'persistent' : 'fresh'
-        const next = resolveConfig(resolveModeTarget(config ?? {}, mode, params.headed === true))
-        if (client) {
-          try {
-            await client.close()
-          } catch {
-            // A half-dead transport must not block the switch.
-          }
-          client = undefined
-        }
-        prepareBrowserProfile(next)
-        client = new DevToolsClient(next)
-        await client.ensureReady(signal)
-        config = next
-        currentMode = mode
+        const next = await switchBackend(mode, params.headed === true, signal)
         return {
           content: [
             {

@@ -33,9 +33,10 @@ describe('looksLikeLoginWall', () => {
   it('needs two content signals without a login URL', async () => {
     const { looksLikeLoginWall } = await import('../dist/tool-augment.js')
     assert.equal(looksLikeLoginWall('https://x.com/', 'Sign in'), false)
+    // Bot-check copy alone is a challenge, not a login wall.
     assert.equal(
       looksLikeLoginWall('https://x.com/', 'Verifying you are human. Just a moment.'),
-      true
+      false
     )
     assert.equal(
       looksLikeLoginWall(
@@ -80,6 +81,19 @@ describe('expandHome', () => {
     assert.equal(expandHome('/abs/path'), '/abs/path')
     assert.equal(expandHome('https://x/y'), 'https://x/y')
     assert.equal(resolveConfig({ userDataDir: '~/.pi/work' }).userDataDir?.startsWith('~'), false)
+  })
+})
+
+describe('classifyPageState', () => {
+  it('separates login walls from challenges from clean pages', async () => {
+    const { classifyPageState } = await import('../dist/tool-augment.js')
+    assert.equal(classifyPageState('https://x.com/login', 'welcome'), 'login-wall')
+    assert.equal(
+      classifyPageState('https://x.com/', 'Verifying you are human. Just a moment.'),
+      'challenge'
+    )
+    assert.equal(classifyPageState('https://example.com/', 'Example Domain'), 'ok')
+    assert.equal(classifyPageState('https://x.com/', 'Sign in'), 'ok')
   })
 })
 

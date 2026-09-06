@@ -41,14 +41,15 @@ export function looksOverlayBlocked(text: string): boolean {
 
 const LOGIN_URL =
   /(^|\/)(login|log-in|signin|sign-in|auth|authenticate|challenge|verify|2fa|totp|sso)(\/|$|[?#])/i
+// Identity-specific phrases only. Bot-check vocabulary (Turnstile, "just a
+// moment") belongs to CHALLENGE below — mixing them makes one interstitial
+// count twice and misclassify challenges as login walls.
 const LOGIN_CONTENT = [
-  /verifying you are human/i,
-  /just a moment/i,
-  /cf-turnstile/i,
   /log in to continue/i,
   /sign in to continue/i,
   /two-factor authentication/i,
   /2-step verification/i,
+  /enter your password/i,
 ]
 
 /**
@@ -58,6 +59,22 @@ const LOGIN_CONTENT = [
 export function looksLikeLoginWall(url: string | undefined, text: string): boolean {
   if (url && LOGIN_URL.test(url)) return true
   return LOGIN_CONTENT.filter((pattern) => pattern.test(text)).length >= 2
+}
+
+export type PageState = 'ok' | 'login-wall' | 'challenge'
+
+const CHALLENGE =
+  /just a moment|verifying you are human|cf-turnstile|attention required|security check|prove you are human/i
+
+/**
+ * Classify what kind of gate (if any) a page presents. Login walls need an
+ * identity; challenges (bot checks) may clear on their own and never need
+ * one — escalating identity for a challenge is wrong.
+ */
+export function classifyPageState(url: string | undefined, text: string): PageState {
+  if (looksLikeLoginWall(url, text)) return 'login-wall'
+  if (CHALLENGE.test(url ?? '') || CHALLENGE.test(text)) return 'challenge'
+  return 'ok'
 }
 
 export function extractTextContent(content: unknown): string {
