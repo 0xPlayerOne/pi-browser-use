@@ -22,7 +22,7 @@ Save, don't inline — `browser_save_artifact` returns paths. Inline `browser_ta
 
 ## When the tree is blind (canvas/WebGL)
 
-1. `browser_analyze_screenshot` (requires `visionModel` config) for coordinates or element identification the tree cannot provide.
+1. `browser_analyze_screenshot` (requires `visionModel` config) for coordinates or element identification the tree cannot provide. Without it and with a vision-less model, fall back to the global `vision` skill (external Gemini describe script) instead of guessing pixels.
 2. Feed coordinates to `browser_click_at` — never guess pixels yourself.
 3. If the scene needs deterministic frames (animations, thumbnails), stop: that is `playwright-handoff` territory (`waitForFunction`, fixed timeouts, traces).
 

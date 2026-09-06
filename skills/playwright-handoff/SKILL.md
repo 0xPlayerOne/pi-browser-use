@@ -69,6 +69,10 @@ PLAYWRIGHT_HEADLESS=1 bunx playwright test --config=playwright.config.ts
 
 Keep headed runs for human-watched perf validation only.
 
+## Python alternative
+
+For Python-first repos, the global `webapp-testing` skill covers the same ground with `sync_playwright()` scripts and a multi-server lifecycle helper — same handoff rule applies regardless of language.
+
 ## Reporting back
 
 Summarize pass/fail plus the failing assertion or trace path. Delete nothing from the repo — the only artifacts are `/tmp/*.spec.ts` and the shared browser cache.
