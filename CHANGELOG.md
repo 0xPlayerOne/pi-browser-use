@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.6.0...pi-browser-use-v0.6.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* don't relaunch when escalation target is already headed ([5f6cfbd](https://github.com/0xPlayerOne/pi-browser-use/commit/5f6cfbdf3df3cad7e651f6e17bff741bdd0e456a))
+
 ## [0.6.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.5.0...pi-browser-use-v0.6.0) (2026-09-06)
 
 
