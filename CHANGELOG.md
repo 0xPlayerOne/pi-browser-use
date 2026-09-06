@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.3.1...pi-browser-use-v0.3.2) (2026-09-06)
+
+
+### Bug Fixes
+
+* **skills:** quote frontmatter descriptions so Pi parses them ([3c92293](https://github.com/0xPlayerOne/pi-browser-use/commit/3c922933a987b5d976830f52c10e6cf4b3c444d8))
+
 ## [0.3.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.3.0...pi-browser-use-v0.3.1) (2026-09-06)
 
 
