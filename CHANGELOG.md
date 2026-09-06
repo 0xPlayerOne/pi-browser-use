@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.4](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.4.3...pi-browser-use-v0.4.4) (2026-09-06)
+
+
+### Maintenance
+
+* **sync:** adopt code-foundry v1.0.4 baseline ([bb2a264](https://github.com/0xPlayerOne/pi-browser-use/commit/bb2a2640db059533bc72608078e72f9c2cf83b9f))
+
 ## [0.4.3](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.4.2...pi-browser-use-v0.4.3) (2026-09-06)
 
 
