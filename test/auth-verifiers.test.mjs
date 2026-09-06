@@ -119,6 +119,39 @@ describe('ensureSiteAuthenticated', () => {
   })
 })
 
+describe('gmailVerifier against real sign-in HTML', () => {
+  // Captured live 2026-09: Google serves a JS hop to accounts.google.com
+  // whose CSS embeds --gm3-sys-color-primary. Bare "primary" matching
+  // once classified this as an authenticated inbox.
+  const SIGNIN_HTML =
+    '<!DOCTYPE html><html><head><base href="https://accounts.google.com/v3/signin">' +
+    '<style>.x{--gm3-sys-color-primary:#0b57d0}</style></head>' +
+    '<body><div>Sign in</div><span>to continue to Gmail</span></body></html>'
+
+  it('never reports an inbox on the sign-in interstitial', () => {
+    assert.equal(
+      checkSiteAuth(gmailVerifier, { url: 'https://mail.google.com/', snapshotText: SIGNIN_HTML })
+        .status,
+      'auth-required'
+    )
+    assert.equal(gmailVerifier.isAuthenticated(SIGNIN_HTML, 'https://mail.google.com/'), false)
+  })
+
+  it('detects the live WebLiteSignIn wall (v3 URL + account chooser copy)', () => {
+    // Captured live 2026-09 from the real Pi profile headless: Gmail hops to
+    // accounts.google.com/v3/signin with flowName=WebLiteSignIn and shows
+    // "Sign in / with your Google Account to continue to Gmail".
+    const url =
+      'https://accounts.google.com/v3/signin/identifier?continue=https://mail.google.com/mail/u/0/' +
+      '&flowName=WebLiteSignIn&flowEntry=ServiceLogin&service=mail'
+    const text =
+      'heading "Sign in" with your Google Account to continue to Gmail. ' +
+      'textbox "Email or phone" link "Forgot email?" button "Next"'
+    assert.equal(checkSiteAuth(gmailVerifier, { url, snapshotText: text }).status, 'auth-required')
+    assert.equal(gmailVerifier.isAuthenticated(text, url), false)
+  })
+})
+
 describe('BUILTIN_VERIFIERS', () => {
   it('registers google and github providers', () => {
     assert.ok(BUILTIN_VERIFIERS.google)

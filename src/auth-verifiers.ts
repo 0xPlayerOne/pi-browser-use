@@ -47,20 +47,43 @@ export function checkSiteAuth(verifier: SiteAuthVerifier, page: AuthCheckPage): 
 }
 
 const GOOGLE_LOGIN_URL =
-  /accounts\.google\.com\/(signin|ServiceLogin|challenge|password|otp|verification)/i
+  /accounts\.google\.com\/(v\d+\/)?(signin|ServiceLogin|challenge|password|otp|verification)/i
+const GOOGLE_LOGIN_QUERY = /[?&](flowEntry=ServiceLogin|flowName=WebLiteSignIn|service=mail)/i
 const GOOGLE_CHALLENGE_COPY =
-  /verify it'?s you|2-step verification|two-factor|enter your password|choose an account to continue|sign in to continue to gmail/i
+  /verify it'?s you|2-step verification|two-factor|enter your password|choose an account to continue|sign in to continue to gmail|to continue to gmail/i
+
+/** Raw-DOM login redirect: Gmail serves a JS hop to accounts.google.com. */
+const GMAIL_LOGIN_BASE = /<base\s+href="https:\/\/accounts\.google\.com/i
+/**
+ * Inbox markers. Deliberately excludes bare "primary": Google login pages
+ * embed it in CSS custom properties (--gm3-sys-color-primary), which caused
+ * a false authenticated verdict on real sign-in HTML (live-tested 2026-09).
+ */
+const GMAIL_INBOX_MARKERS = [
+  /inbox/i,
+  /compose/i,
+  /search mail/i,
+  /conversation view/i,
+  /sent mail/i,
+  /\bdrafts\b/i,
+]
 
 /** Gmail: inbox DOM vs Google login/challenge (never conflate Chrome-profile
  * sign-in with a mail.google.com session — they are different states). */
 export const gmailVerifier: SiteAuthVerifier = {
   provider: 'google',
   destinationUrl: 'https://mail.google.com/',
-  isAuthenticated: (text, url) =>
-    /mail\.google\.com/i.test(url) &&
-    /inbox|primary|compose|search mail|conversation view/i.test(text) &&
-    !GOOGLE_LOGIN_URL.test(url),
-  isLoginOrChallenge: (text, url) => GOOGLE_LOGIN_URL.test(url) || GOOGLE_CHALLENGE_COPY.test(text),
+  isAuthenticated: (text, url) => {
+    if (!/mail\.google\.com/i.test(url)) return false
+    if (GOOGLE_LOGIN_URL.test(url) || GOOGLE_LOGIN_QUERY.test(url)) return false
+    if (GMAIL_LOGIN_BASE.test(text) || GOOGLE_CHALLENGE_COPY.test(text)) return false
+    return GMAIL_INBOX_MARKERS.filter((pattern) => pattern.test(text)).length >= 2
+  },
+  isLoginOrChallenge: (text, url) =>
+    GOOGLE_LOGIN_URL.test(url) ||
+    GOOGLE_LOGIN_QUERY.test(url) ||
+    GMAIL_LOGIN_BASE.test(text) ||
+    GOOGLE_CHALLENGE_COPY.test(text),
 }
 
 const GITHUB_LOGIN_URL = /(^|\/)((login|session|auth)(\/|$|[?#]))/i
