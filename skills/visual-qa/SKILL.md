@@ -1,6 +1,6 @@
 ---
 name: visual-qa
-description: Screenshot discipline for visual checks of WebGL/canvas scenes and layouts. Use when asked whether something "looks right", for before/after comparisons, or for viewport coverage.
+description: "Screenshot discipline for visual checks of WebGL/canvas scenes and layouts. Use when asked whether something \"looks right\", for before/after comparisons, or for viewport coverage."
 ---
 
 # Visual QA

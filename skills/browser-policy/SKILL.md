@@ -1,6 +1,6 @@
 ---
 name: browser-policy
-description: Browser-use policy for Pi agents. Use before any browser_* tool call: prefer CLIs and APIs over browser automation, default to fresh headless sessions, escalate to the authenticated profile only on login walls, and never steal user focus.
+description: "Browser-use policy for Pi agents. Use before any browser_* tool call. Prefer CLIs and APIs over browser automation, default to fresh headless sessions, escalate to the authenticated profile only on login walls, and never steal user focus."
 ---
 
 # Browser Policy

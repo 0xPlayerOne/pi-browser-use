@@ -1,6 +1,6 @@
 ---
 name: playwright-handoff
-description: Decide when browser automation has hit its limits and hand off to a repo Playwright run instead. Use when a task needs request mocking, assertions, traces, repeatability, or CI parity that browser_* tools cannot provide.
+description: "Decide when browser automation has hit its limits and hand off to a repo Playwright run instead. Use when a task needs request mocking, assertions, traces, repeatability, or CI parity that browser_* tools cannot provide."
 ---
 
 # Playwright Handoff

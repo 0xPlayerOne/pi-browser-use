@@ -1,6 +1,6 @@
 ---
 name: triage-console
-description: Standard flow for diagnosing a broken page. Use when a site misbehaves, renders wrong, or throws — snapshot, console errors, failed network requests, then screenshot.
+description: "Standard flow for diagnosing a broken page. Use when a site misbehaves, renders wrong, or throws — snapshot, console errors, failed network requests, then screenshot."
 ---
 
 # Console Triage
