@@ -63,13 +63,14 @@ export interface BrowserUseConfig {
 }
 
 /**
- * Fresh headless by default: isolated ephemeral profile, no window, never
- * steals focus. Set sessionMode "persistent" for the authenticated profile
- * (log in once, cookies persist), or "existing" + autoConnect to drive your
- * daily Chrome (intrusive: windows pop and steal focus).
+ * Persistent headless by default: Pi-owned profile, no window, never steals
+ * focus, no consent popups (log in once via browser_setup, cookies persist).
+ * Set sessionMode "isolated" (or mode "fresh") for an anonymous clean room,
+ * or "existing" + autoConnect to drive your daily Chrome (intrusive:
+ * consent popup every session, windows may pop and steal focus).
  */
 const DEFAULTS: BrowserUseConfig = {
-  sessionMode: 'isolated',
+  sessionMode: 'persistent',
   headless: true,
   categoryPerformance: false,
   categoryNetwork: true,

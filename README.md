@@ -4,8 +4,8 @@ Opinionated browser-use for the [Pi coding agent](https://pi.dev), powered by [`
 
 ## Why this exists
 
-- **Fresh headless by default** — isolated ephemeral profile, no window, never steals focus.
-- **Authenticated profile opt-in** — `sessionMode: persistent` self-launches Pi-owned Chrome on `~/.pi/browser-profile` (log in once via `browser_setup`); MCP attaches over an ephemeral loopback port.
+- **Persistent Pi browser by default** — self-launched headless Chrome on `~/.pi/browser-profile` (log in once via `browser_setup`); MCP attaches over an ephemeral loopback port. No window, no focus steal, no consent popups.
+- **Fresh clean room on request** — `mode: fresh` for anonymous checks; nothing persists.
 - **Existing-Chrome escape hatch** — `mode: existing` brokers background tabs into the collapsed `pi-browser-use` group via the bundled extension (`extension/`).
 - **CLI-first policy bundled** — `skills/browser-policy` tells agents to prefer `gh` / `wrangler` / APIs and web fetching before driving the browser.
 - **Safer proxying** — `browser_`-prefixed tools, noisy/privileged tools excluded, sensitive network headers redacted, background/focus-safe page defaults.
@@ -27,18 +27,20 @@ Settings key is `pi-browser-use` in `~/.pi/agent/settings.json` (user) or `.pi/s
 ```json
 {
   "pi-browser-use": {
-    "mode": "fresh",
+    "mode": "persistent",
     "headed": false,
     "visionModel": { "provider": "openai", "model": "gpt-4o" }
   }
 }
 ```
 
-| `mode`            | Behavior                                                    |
-| ----------------- | ----------------------------------------------------------- |
-| `fresh` (default) | Isolated clean room, thrown away each session               |
-| `persistent`      | Saved profile with your logins (`~/.pi/browser-profile`)    |
-| `existing`        | Attach to your running Chrome — intrusive, avoid by default |
+`persistent` is already the default; the snippet above pins it explicitly. There is no consent popup in this mode — Chrome's per-session "Allow remote debugging?" gate applies to `existing` only.
+
+| `mode`            | Behavior                                                                     |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `persistent` (default) | Pi's own browser: saved profile with your logins (`~/.pi/browser-profile`) |
+| `fresh`           | Isolated clean room, thrown away each session                                |
+| `existing`        | Attach to your running Chrome — consent popup each session, avoid by default |
 
 `headed: true` shows the window (both modes default headless); `existing` is always headed. `visionModel` enables `browser_analyze_screenshot`; omit it and the tool stays unregistered.
 

@@ -15,10 +15,10 @@ description: "Browser-use policy for Pi agents. Use before any browser_* tool ca
 
 ## Session modes
 
-- **Default: fresh headless** (`mode: fresh`). Ephemeral profile, no window, never steals focus. Use for public pages and smoke checks.
-- **Authenticated profile** (`mode: persistent`). Pi self-launches Chrome on its dedicated profile (`~/.pi/browser-profile`) and MCP attaches — log in once, cookies persist. Use when the task needs your identity (private repos, Cloudflare dashboard). Defaults headless; pass `headed: true` to watch, and warn the user before any headed launch.
+- **Default: persistent headless** (`mode: persistent`). Pi's own browser on its dedicated profile (`~/.pi/browser-profile`): self-launched Chrome, no window, never steals focus, no consent popups. Log in once via `browser_setup`; cookies persist. Use for everything unless there's a reason not to. Pass `headed: true` to watch, and warn the user before any headed launch.
+- **Clean room** (`mode: fresh`). Ephemeral profile, thrown away each session. Use for anonymous checks, hostile links, and "does it render logged-out?" verifications — never for anything needing identity.
 - **Existing Chrome** (`mode: existing`) attaches to the user's running Chrome — intrusive (drives the daily browser, sees all tabs). Avoid unless the user explicitly asks. First attach shows Chrome's "Allow remote debugging?" consent popup (once per session — click Allow). Pi tabs must be opened with `browser_open_background_tab` (extension-brokered into the collapsed `pi-browser-use` group), never raw `browser_new_page`. Closing the last Pi tab dissolves the group automatically; `browser_close_page` refuses tabs Pi didn't open unless `force: true` was explicitly requested.
-- **Switch, don't restart**: `browser_switch_mode` moves between fresh, persistent, and existing mid-session. Start fresh; escalate to persistent on login walls; drop back to fresh for clean-room checks.
+- **Switch, don't restart**: `browser_switch_mode` moves between persistent, fresh, and existing mid-session. Start persistent; drop to fresh for clean-room checks; touch existing only when the user explicitly asks.
 - **Hard blocks escalate themselves**: login walls in fresh sessions suggest the switch call; login walls and bot challenges in authenticated sessions rebuild headed and prompt the human. Once per call, never looping, never in attached sessions — and a headed popup from a block is the one case where stealing focus is the job, not a bug.
 - **Visual analysis** (`browser_analyze_screenshot`, only when `visionModel` is configured) is for canvas/WebGL scenes and coordinate clicks the tree cannot describe — not a substitute for reading the snapshot first.
 
@@ -45,8 +45,8 @@ Turnstile, device checks, SSO/2FA cannot be automated away. On hitting one: stop
 
 ## Browser mode rules
 
-1. Prefer Fresh for anonymous/stateless browsing.
-2. Prefer Persistent whenever login/session persistence is useful.
+1. Prefer Persistent (the default) for everything: Pi's browser, invisible, no popups.
+2. Use Fresh only for anonymous/stateless browsing: hostile links, logged-out checks, clean-room reproductions.
 3. Persistent uses Pi's dedicated browser profile — never the user's daily Chrome data.
 4. If Persistent has never been initialized, launch the Pi Browser setup flow (headed once, human signs in, close the window).
 5. Never attempt to automate credentials, CAPTCHA, 2FA, passkeys, or security challenges that require the user.

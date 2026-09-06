@@ -160,8 +160,8 @@ function toToolContent(
  * discovers upstream tools, and registers each as browser_*. On
  * session_shutdown tears the subprocess down. Nothing runs persistently.
  *
- * Defaults are fresh headless (isolated ephemeral profile, no window). Set
- * sessionMode "persistent" for the authenticated profile, or "existing" with
+ * Defaults are persistent headless (Pi-owned profile, no window, no consent
+ * popups). Set mode "fresh" for an isolated clean room, or "existing" with
  * autoConnect/browserUrl to drive an already-running Chrome.
  */
 export default function browserUseExtension(pi: Pi) {
@@ -600,7 +600,7 @@ export default function browserUseExtension(pi: Pi) {
       name: `${TOOL_PREFIX}switch_mode`,
       label: `${TOOL_PREFIX}switch_mode`,
       description:
-        'Switch the browser backend without restarting: "fresh" is an isolated clean room, "persistent" keeps the saved Pi profile with your logins, "existing" attaches to your running Chrome (tabs go to the collapsed pi-browser-use group via browser_open_background_tab). Fresh and persistent default to headless; pass headed true to watch. Tabs do not transfer; call browser_list_pages after switching. Prefer fresh; escalate to persistent only on login walls.',
+        'Switch the browser backend without restarting: "persistent" is Pi\'s own browser (saved profile with your logins, default), "fresh" is an isolated clean room for anonymous checks, "existing" attaches to your running Chrome (tabs go to the collapsed pi-browser-use group via browser_open_background_tab, consent popup each session). Fresh and persistent default to headless; pass headed true to watch. Tabs do not transfer; call browser_list_pages after switching. Prefer persistent; drop to fresh for clean-room checks.',
       parameters: Type.Object({
         mode: Type.Union([
           Type.Literal('fresh'),
