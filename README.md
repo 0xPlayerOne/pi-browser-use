@@ -43,6 +43,13 @@ Settings key is `pi-browser-use` in `~/.pi/agent/settings.json` (user) or `.pi/s
 
 All browser behavior plus the policy skill in one install; `.pi/settings.json` is purely for overrides.
 
+Per-project identity composes: user settings set the default, trusted project settings win per repo. Example — separate agent profiles per project:
+
+```jsonc
+// ~/Developer/work/.pi/settings.json
+{ "pi-browser-use": { "mode": "persistent", "userDataDir": "~/.pi/browser-profile-work" } }
+```
+
 <details>
 <summary>Advanced: full option reference (upstream parity)</summary>
 

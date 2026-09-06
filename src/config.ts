@@ -1,5 +1,5 @@
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
 export const DEFAULT_PROFILE_DIR = join(homedir(), '.pi', 'browser-profile')
 
@@ -120,10 +120,19 @@ export function resolveModeTarget(
   }
 }
 
+/** Expand a leading ~/ in user-supplied paths (env interpolation covers ${} only). */
+export function expandHome(path: string): string {
+  return path === '~' ? homedir() : path.startsWith('~/') ? resolve(homedir(), path.slice(2)) : path
+}
+
 /** Merge user config over fresh-headless defaults. */
 export function resolveConfig(config?: BrowserUseConfig): BrowserUseConfig {
   const { mode, headed, ...rest } = config ?? {}
   const resolved: BrowserUseConfig = { ...DEFAULTS, ...rest }
+  if (typeof resolved.userDataDir === 'string')
+    resolved.userDataDir = expandHome(resolved.userDataDir)
+  if (typeof resolved.executablePath === 'string')
+    resolved.executablePath = expandHome(resolved.executablePath)
   if (mode !== undefined) {
     // The simple facade wins over sessionMode/headless when present.
     if (mode === 'fresh') {

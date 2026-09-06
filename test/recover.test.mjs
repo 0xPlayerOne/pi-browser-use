@@ -72,6 +72,17 @@ describe('mode facade', () => {
   })
 })
 
+describe('expandHome', () => {
+  it('expands leading ~/ against the home directory', async () => {
+    const { expandHome, resolveConfig } = await import('../dist/config.js')
+    assert.match(expandHome('~/.pi/x'), /\.pi\/x$/)
+    assert.ok(!expandHome('~/.pi/x').startsWith('~'))
+    assert.equal(expandHome('/abs/path'), '/abs/path')
+    assert.equal(expandHome('https://x/y'), 'https://x/y')
+    assert.equal(resolveConfig({ userDataDir: '~/.pi/work' }).userDataDir?.startsWith('~'), false)
+  })
+})
+
 describe('artifacts', () => {
   it('resolves explicit paths verbatim', () => {
     assert.equal(resolveArtifactTarget('screenshot', '/tmp/x.png'), '/tmp/x.png')
