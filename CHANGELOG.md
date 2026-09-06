@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.5.0...pi-browser-use-v0.6.0) (2026-09-06)
+
+
+### Features
+
+* automatic escalation for login walls and bot challenges ([782ab0e](https://github.com/0xPlayerOne/pi-browser-use/commit/782ab0e6adaa265a548c36a41e50bf7dbe6ab9cb))
+* expand leading ~/ in profile and executable paths ([78a3870](https://github.com/0xPlayerOne/pi-browser-use/commit/78a3870cd983ba589aae1734c018b6f7a042fcb4))
+
 ## [0.5.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.4.4...pi-browser-use-v0.5.0) (2026-09-06)
 
 
