@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.6.1...pi-browser-use-v0.7.0) (2026-09-06)
+
+
+### Features
+
+* browser modes phase 2+ — self-launched persistent Chrome, reauth, tab broker ([#16](https://github.com/0xPlayerOne/pi-browser-use/issues/16)) ([72e98b0](https://github.com/0xPlayerOne/pi-browser-use/commit/72e98b0459b9c0146cd9ab30553d8d110a536e5a))
+
 ## [0.6.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.6.0...pi-browser-use-v0.6.1) (2026-09-06)
 
 
