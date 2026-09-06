@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { resolveModeTarget } from '../dist/config.js'
 
 describe('resolveModeTarget', () => {
-  it('fresh always means isolated headless with attach fields stripped', () => {
+  it('fresh means isolated with attach fields stripped, headless by default', () => {
     const next = resolveModeTarget(
       {
         sessionMode: 'existing',
@@ -21,6 +21,12 @@ describe('resolveModeTarget', () => {
     assert.equal(next.autoConnect, undefined)
     assert.equal(next.userDataDir, undefined)
     assert.equal(next.viewport, '1280x720')
+  })
+
+  it('fresh honors an explicit headed request', () => {
+    const next = resolveModeTarget({ sessionMode: 'persistent' }, 'fresh', true)
+    assert.equal(next.sessionMode, 'isolated')
+    assert.equal(next.headless, false)
   })
 
   it('auth means the persistent profile, headless by default', () => {

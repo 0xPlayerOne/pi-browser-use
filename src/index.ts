@@ -304,13 +304,13 @@ export default function browserUseExtension(pi: Pi) {
       name: `${TOOL_PREFIX}switch_mode`,
       label: `${TOOL_PREFIX}switch_mode`,
       description:
-        'Switch the browser backend without restarting: "fresh" is an isolated headless clean room, "auth" is the persistent profile with your logins. Tabs do not transfer; call browser_list_pages after switching. Prefer fresh; escalate to auth only on login walls.',
+        'Switch the browser backend without restarting: "fresh" is an isolated clean room, "auth" is the persistent profile with your logins. Both default to headless; pass headed true to watch. Tabs do not transfer; call browser_list_pages after switching. Prefer fresh; escalate to auth only on login walls.',
       parameters: Type.Object({
         mode: Type.Union([Type.Literal('fresh'), Type.Literal('auth')]),
         headed: Type.Optional(
           Type.Boolean({
             description:
-              'Auth mode only: show the browser window. Default is headless — logins still work with no popups.',
+              'Show the browser window. Default is headless — everything works with no popups.',
           })
         ),
       }),

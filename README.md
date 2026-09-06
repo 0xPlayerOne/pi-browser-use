@@ -88,7 +88,7 @@ browser_save_artifact({ "pageId": 1, "kind": "screenshot", "annotate": true })
 
 ### `browser_switch_mode`
 
-Switch backends without restarting: `fresh` (isolated headless clean room) or `auth` (persistent profile with your logins, headless by default — pass `headed: true` to watch). Tabs do not transfer; call `browser_list_pages` after switching. Prefer fresh; escalate to auth only on login walls.
+Switch backends without restarting: `fresh` (isolated clean room) or `auth` (persistent profile with your logins). Both default to headless — pass `headed: true` to watch. Tabs do not transfer; call `browser_list_pages` after switching. Prefer fresh; escalate to auth only on login walls.
 
 ### `browser_doctor`
 

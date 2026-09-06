@@ -95,7 +95,7 @@ export function resolveModeTarget(
   if (mode === 'fresh') {
     const { userDataDir: _userDataDir, ...freshRest } = rest
     void _userDataDir
-    return { ...freshRest, sessionMode: 'isolated', headless: true, isolated: true }
+    return { ...freshRest, sessionMode: 'isolated', headless: !headed, isolated: true }
   }
   return {
     ...rest,
