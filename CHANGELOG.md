@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.7.0...pi-browser-use-v0.8.0) (2026-09-06)
+
+
+### Features
+
+* multi-agent shared persistent browser with page ownership ([b4961e6](https://github.com/0xPlayerOne/pi-browser-use/commit/b4961e608648b4f9c8b5aadf2aa0f334d292a68d))
+
 ## [0.7.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.6.1...pi-browser-use-v0.7.0) (2026-09-06)
 
 

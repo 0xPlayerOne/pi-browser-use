@@ -1,6 +1,6 @@
 {
   "name": "pi-browser-use",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Opinionated browser-use for the Pi coding agent, powered by chrome-devtools-mcp (not Playwright). Fresh headless by default, authenticated persistent profile opt-in, CLI-first policy bundled.",
   "keywords": [
     "pi-package",
