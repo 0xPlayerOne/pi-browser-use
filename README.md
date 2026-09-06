@@ -176,6 +176,8 @@ On startup the default persistent profile is checked for accessibility. A root-o
 | `profile is already in use`        | Two sessions sharing one `userDataDir`                                                  | Use isolated mode or separate dirs per session                                       |
 | Stale uid errors                   | Page re-rendered after your snapshot                                                    | Take a fresh snapshot; ids invalidate on every action                                |
 | Vision tool missing                | No `visionModel` configured                                                             | Add it; otherwise use tree uids, or the global `vision` skill for vision-less models |
+| "Allow remote debugging?" popup  | Chrome 144+ consent gate for MCP auto-attach in Existing mode                           | Click Allow (once per Pi session); persistent mode never triggers it                 |
+| Pi tab closed the wrong tab        | Page IDs shift when tabs close — fixed                                                  | Existing `close_page` now refuses tabs Pi didn't open unless `force: true`           |
 
 ## License
 
