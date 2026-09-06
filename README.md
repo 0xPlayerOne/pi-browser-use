@@ -26,21 +26,29 @@ Settings key is `pi-browser-use` in `~/.pi/agent/settings.json` (user) or `.pi/s
 ```json
 {
   "pi-browser-use": {
-    "sessionMode": "isolated",
-    "headless": true
+    "mode": "fresh",
+    "headed": false,
+    "visionModel": { "provider": "openai", "model": "gpt-4o" }
   }
 }
 ```
 
-| Mode            | Config                                  | Behavior                                               |
-| --------------- | --------------------------------------- | ------------------------------------------------------ |
-| Fresh (default) | `isolated` + `headless: true`           | Ephemeral profile, no window, never steals focus       |
-| Authenticated   | `sessionMode: persistent`               | Shared profile, log in once, headed windows pop        |
-| Existing        | `sessionMode: existing` + `autoConnect` | Drives your daily Chrome — intrusive, avoid by default |
+| `mode`            | Behavior                                                      |
+| ----------------- | ------------------------------------------------------------- |
+| `fresh` (default) | Isolated clean room, thrown away each session                 |
+| `auth`            | Persistent profile with your logins (`~/.pi/browser-profile`) |
+| `existing`        | Attach to your running Chrome — intrusive, avoid by default   |
+
+`headed: true` shows the window (both modes default headless); `existing` is always headed. `visionModel` enables `browser_analyze_screenshot`; omit it and the tool stays unregistered.
 
 All browser behavior plus the policy skill in one install; `.pi/settings.json` is purely for overrides.
 
-### Full option reference
+<details>
+<summary>Advanced: full option reference (upstream parity)</summary>
+
+`mode` overrides `sessionMode`/`headless` when present; `headed` overrides `headless`.
+
+### Full option reference (advanced)
 
 | Option                 | Type       | Default    | Description                                                                    |
 | ---------------------- | ---------- | ---------- | ------------------------------------------------------------------------------ |
@@ -60,6 +68,8 @@ All browser behavior plus the policy skill in one install; `.pi/settings.json` i
 | `blockedUrlPattern`    | `string[]` | —          | Block matching URL patterns (mutually exclusive with allow)                    |
 | `redactNetworkHeaders` | `boolean`  | `true`     | Strip sensitive headers from network results                                   |
 | `acceptInsecureCerts`  | `boolean`  | `false`    | Ignore self-signed/expired certificates                                        |
+
+</details>
 
 First-class `chromeArgs` only apply when `chrome-devtools-mcp` launches Chrome itself — never with `autoConnect`/`browserUrl`. On macOS `--start-minimized` is ignored; only `headless: true` truly hides the window.
 

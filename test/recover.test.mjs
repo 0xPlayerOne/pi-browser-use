@@ -2,6 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { looksOverlayBlocked, OVERLAY_RECOVERABLE } from '../dist/tool-augment.js'
 import { pickImageData, resolveArtifactTarget } from '../dist/artifacts.js'
+import { resolveConfig } from '../dist/config.js'
 
 describe('overlay recovery matching', () => {
   it('flags overlay-blocked failures', () => {
@@ -42,6 +43,31 @@ describe('looksLikeLoginWall', () => {
         'Log in to continue. Two-factor authentication required.'
       ),
       true
+    )
+  })
+})
+
+describe('mode facade', () => {
+  it('maps fresh/auth/existing to session semantics', () => {
+    assert.equal(resolveConfig({ mode: 'fresh' }).sessionMode, 'isolated')
+    assert.equal(resolveConfig({ mode: 'fresh' }).headless, true)
+    assert.equal(resolveConfig({ mode: 'auth' }).sessionMode, 'persistent')
+    assert.equal(resolveConfig({ mode: 'auth' }).headless, true)
+    const existing = resolveConfig({ mode: 'existing' })
+    assert.equal(existing.sessionMode, 'existing')
+    assert.equal(existing.autoConnect, true)
+  })
+
+  it('headed flips visibility without touching the profile', () => {
+    assert.equal(resolveConfig({ mode: 'auth', headed: true }).headless, false)
+    assert.equal(resolveConfig({ headed: true }).headless, false)
+    assert.equal(resolveConfig({ sessionMode: 'persistent', headed: true }).headless, false)
+  })
+
+  it('mode wins over legacy sessionMode', () => {
+    assert.equal(
+      resolveConfig({ mode: 'fresh', sessionMode: 'persistent' }).sessionMode,
+      'isolated'
     )
   })
 })

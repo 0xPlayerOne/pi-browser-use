@@ -11,8 +11,22 @@ export interface VisionModelConfig {
   model: string
 }
 
+/** Simple mode selector. Takes precedence over sessionMode/headless when set. */
+export type BrowserModeOption = 'fresh' | 'auth' | 'existing'
+
 /** Configuration for the chrome-devtools-mcp subprocess. Same settings key as before: "pi-browser-use". */
 export interface BrowserUseConfig {
+  /**
+   * Simple facade: fresh (isolated clean room), auth (persistent profile
+   * with your logins), existing (attach to your running Chrome). Overrides
+   * sessionMode and headless/headed below when present.
+   */
+  mode?: BrowserModeOption
+  /**
+   * Show the browser window. Default false (headless) for fresh and auth;
+   * existing is always headed. Overrides headless below when present.
+   */
+  headed?: boolean
   sessionMode?: BrowserSessionMode
   headless?: boolean
   channel?: 'canary' | 'dev' | 'beta' | 'stable'
@@ -108,7 +122,22 @@ export function resolveModeTarget(
 
 /** Merge user config over fresh-headless defaults. */
 export function resolveConfig(config?: BrowserUseConfig): BrowserUseConfig {
-  const resolved: BrowserUseConfig = { ...DEFAULTS, ...config }
+  const { mode, headed, ...rest } = config ?? {}
+  const resolved: BrowserUseConfig = { ...DEFAULTS, ...rest }
+  if (mode !== undefined) {
+    // The simple facade wins over sessionMode/headless when present.
+    if (mode === 'fresh') {
+      resolved.sessionMode = 'isolated'
+      resolved.headless = !(headed ?? false)
+    } else if (mode === 'auth') {
+      resolved.sessionMode = 'persistent'
+      resolved.headless = !(headed ?? false)
+    } else {
+      resolved.sessionMode = 'existing'
+    }
+  } else if (headed !== undefined) {
+    resolved.headless = !headed
+  }
   if (resolved.allowedUrlPattern?.length && resolved.blockedUrlPattern?.length) {
     throw new Error('allowedUrlPattern and blockedUrlPattern cannot be used together')
   }
