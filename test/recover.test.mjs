@@ -51,15 +51,15 @@ describe('mode facade', () => {
   it('maps fresh/auth/existing to session semantics', () => {
     assert.equal(resolveConfig({ mode: 'fresh' }).sessionMode, 'isolated')
     assert.equal(resolveConfig({ mode: 'fresh' }).headless, true)
-    assert.equal(resolveConfig({ mode: 'auth' }).sessionMode, 'persistent')
-    assert.equal(resolveConfig({ mode: 'auth' }).headless, true)
+    assert.equal(resolveConfig({ mode: 'persistent' }).sessionMode, 'persistent')
+    assert.equal(resolveConfig({ mode: 'persistent' }).headless, true)
     const existing = resolveConfig({ mode: 'existing' })
     assert.equal(existing.sessionMode, 'existing')
     assert.equal(existing.autoConnect, true)
   })
 
   it('headed flips visibility without touching the profile', () => {
-    assert.equal(resolveConfig({ mode: 'auth', headed: true }).headless, false)
+    assert.equal(resolveConfig({ mode: 'persistent', headed: true }).headless, false)
     assert.equal(resolveConfig({ headed: true }).headless, false)
     assert.equal(resolveConfig({ sessionMode: 'persistent', headed: true }).headless, false)
   })

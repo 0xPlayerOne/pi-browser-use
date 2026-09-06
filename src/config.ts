@@ -12,18 +12,18 @@ export interface VisionModelConfig {
 }
 
 /** Simple mode selector. Takes precedence over sessionMode/headless when set. */
-export type BrowserModeOption = 'fresh' | 'auth' | 'existing'
+export type BrowserModeOption = 'fresh' | 'persistent' | 'existing'
 
 /** Configuration for the chrome-devtools-mcp subprocess. Same settings key as before: "pi-browser-use". */
 export interface BrowserUseConfig {
   /**
-   * Simple facade: fresh (isolated clean room), auth (persistent profile
+   * Simple facade: fresh (isolated clean room), persistent (saved profile
    * with your logins), existing (attach to your running Chrome). Overrides
    * sessionMode and headless/headed below when present.
    */
   mode?: BrowserModeOption
   /**
-   * Show the browser window. Default false (headless) for fresh and auth;
+   * Show the browser window. Default false (headless) for fresh and persistent;
    * existing is always headed. Overrides headless below when present.
    */
   headed?: boolean
@@ -84,13 +84,13 @@ const DEFAULTS: BrowserUseConfig = {
 }
 
 /** In-session backend target for browser_switch_mode. */
-export type BrowserMode = 'fresh' | 'auth'
+export type BrowserMode = 'fresh' | 'persistent'
 
 /**
  * Build the config for a mode switch from the session base config.
- * fresh always means an isolated headless clean room; auth means the
- * persistent profile (headless unless headed is requested, so logins work
- * without popups). Attach fields never carry across modes.
+ * fresh means an isolated clean room; persistent means the saved profile
+ * (headless unless headed is requested, so logins work without popups).
+ * Attach fields never carry across modes.
  */
 export function resolveModeTarget(
   base: BrowserUseConfig,
@@ -129,7 +129,7 @@ export function resolveConfig(config?: BrowserUseConfig): BrowserUseConfig {
     if (mode === 'fresh') {
       resolved.sessionMode = 'isolated'
       resolved.headless = !(headed ?? false)
-    } else if (mode === 'auth') {
+    } else if (mode === 'persistent') {
       resolved.sessionMode = 'persistent'
       resolved.headless = !(headed ?? false)
     } else {

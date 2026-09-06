@@ -30,7 +30,7 @@ describe('resolveModeTarget', () => {
   })
 
   it('auth means the persistent profile, headless by default', () => {
-    const next = resolveModeTarget({ sessionMode: 'isolated', viewport: '1280x720' }, 'auth')
+    const next = resolveModeTarget({ sessionMode: 'isolated', viewport: '1280x720' }, 'persistent')
     assert.equal(next.sessionMode, 'persistent')
     assert.equal(next.headless, true)
     assert.equal(next.isolated, false)
@@ -39,7 +39,7 @@ describe('resolveModeTarget', () => {
   })
 
   it('auth honors an explicit headed request and custom profile dir', () => {
-    const next = resolveModeTarget({ userDataDir: '/tmp/mine' }, 'auth', true)
+    const next = resolveModeTarget({ userDataDir: '/tmp/mine' }, 'persistent', true)
     assert.equal(next.headless, false)
     assert.equal(next.userDataDir, '/tmp/mine')
   })

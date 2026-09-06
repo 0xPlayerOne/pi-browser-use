@@ -33,11 +33,11 @@ Settings key is `pi-browser-use` in `~/.pi/agent/settings.json` (user) or `.pi/s
 }
 ```
 
-| `mode`            | Behavior                                                      |
-| ----------------- | ------------------------------------------------------------- |
-| `fresh` (default) | Isolated clean room, thrown away each session                 |
-| `auth`            | Persistent profile with your logins (`~/.pi/browser-profile`) |
-| `existing`        | Attach to your running Chrome — intrusive, avoid by default   |
+| `mode`            | Behavior                                                    |
+| ----------------- | ----------------------------------------------------------- |
+| `fresh` (default) | Isolated clean room, thrown away each session               |
+| `persistent`      | Saved profile with your logins (`~/.pi/browser-profile`)    |
+| `existing`        | Attach to your running Chrome — intrusive, avoid by default |
 
 `headed: true` shows the window (both modes default headless); `existing` is always headed. `visionModel` enables `browser_analyze_screenshot`; omit it and the tool stays unregistered.
 
@@ -98,7 +98,7 @@ browser_save_artifact({ "pageId": 1, "kind": "screenshot", "annotate": true })
 
 ### `browser_switch_mode`
 
-Switch backends without restarting: `fresh` (isolated clean room) or `auth` (persistent profile with your logins). Both default to headless — pass `headed: true` to watch. Tabs do not transfer; call `browser_list_pages` after switching. Prefer fresh; escalate to auth only on login walls.
+Switch backends without restarting: `fresh` (isolated clean room) or `persistent` (saved profile with your logins). Both default to headless — pass `headed: true` to watch. Tabs do not transfer; call `browser_list_pages` after switching. Prefer fresh; escalate to persistent only on login walls.
 
 ### `browser_doctor`
 

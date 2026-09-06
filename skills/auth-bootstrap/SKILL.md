@@ -1,6 +1,6 @@
 ---
 name: auth-bootstrap
-description: "Log the persistent browser profile in for the first time. Use when auth mode hits a login wall, after switching to a fresh machine, or when SSO, 2FA, or passkeys need a human."
+description: "Log the persistent browser profile in for the first time. Use when the persistent profile hits a login wall, after switching to a fresh machine, or when SSO, 2FA, or passkeys need a human."
 ---
 
 # Auth Bootstrap
@@ -10,7 +10,7 @@ The persistent profile starts empty. Log in once per site; cookies persist acros
 ## Recommended flow: headed once
 
 ```text
-browser_switch_mode({ "mode": "auth", "headed": true })
+browser_switch_mode({ "mode": "persistent", "headed": true })
 ```
 
 1. A visible Chrome window opens on the persistent profile.

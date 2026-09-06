@@ -146,18 +146,18 @@ export default function browserUseExtension(pi: Pi) {
   let client: DevToolsClient | undefined
   // Tracks which identity the live backend holds, so results can suggest
   // escalation. 'custom' covers user-configured attach setups we did not pick.
-  let currentMode: 'fresh' | 'auth' | 'custom' = 'fresh'
+  let currentMode: 'fresh' | 'persistent' | 'custom' = 'fresh'
 
-  function describeMode(): 'fresh' | 'auth' | 'custom' {
+  function describeMode(): 'fresh' | 'persistent' | 'custom' {
     if (config?.sessionMode === 'isolated') return 'fresh'
-    if (config?.sessionMode === 'persistent') return 'auth'
+    if (config?.sessionMode === 'persistent') return 'persistent'
     return 'custom'
   }
 
   function loginWallHint(url: string | undefined, text: string): string {
     if (currentMode !== 'fresh') return ''
     if (!looksLikeLoginWall(url, text)) return ''
-    return '\n\nHint: this looks like a login wall in a fresh (logged-out) session. If the page needs your identity, call browser_switch_mode({"mode": "auth"}) — a human must complete any SSO, 2FA, or passkey step, ideally headed.'
+    return '\n\nHint: this looks like a login wall in a fresh (logged-out) session. If the page needs your identity, call browser_switch_mode({"mode": "persistent"}) — a human must complete any SSO, 2FA, or passkey step, ideally headed.'
   }
 
   function pageUrlFromSnapshot(text: string): string | undefined {
@@ -339,9 +339,9 @@ export default function browserUseExtension(pi: Pi) {
       name: `${TOOL_PREFIX}switch_mode`,
       label: `${TOOL_PREFIX}switch_mode`,
       description:
-        'Switch the browser backend without restarting: "fresh" is an isolated clean room, "auth" is the persistent profile with your logins. Both default to headless; pass headed true to watch. Tabs do not transfer; call browser_list_pages after switching. Prefer fresh; escalate to auth only on login walls.',
+        'Switch the browser backend without restarting: "fresh" is an isolated clean room, "persistent" keeps the saved profile with your logins. Both default to headless; pass headed true to watch. Tabs do not transfer; call browser_list_pages after switching. Prefer fresh; escalate to persistent only on login walls.',
       parameters: Type.Object({
-        mode: Type.Union([Type.Literal('fresh'), Type.Literal('auth')]),
+        mode: Type.Union([Type.Literal('fresh'), Type.Literal('persistent')]),
         headed: Type.Optional(
           Type.Boolean({
             description:
@@ -350,7 +350,7 @@ export default function browserUseExtension(pi: Pi) {
         ),
       }),
       async execute(_toolCallId, params, signal) {
-        const mode: BrowserMode = params.mode === 'auth' ? 'auth' : 'fresh'
+        const mode: BrowserMode = params.mode === 'persistent' ? 'persistent' : 'fresh'
         const next = resolveConfig(resolveModeTarget(config ?? {}, mode, params.headed === true))
         if (client) {
           try {
@@ -371,8 +371,8 @@ export default function browserUseExtension(pi: Pi) {
               type: 'text',
               text:
                 mode === 'fresh'
-                  ? 'Switched to a fresh isolated headless browser. Previous tabs are gone; call browser_list_pages to start.'
-                  : `Switched to the persistent authenticated profile (${next.headless === false ? 'headed' : 'headless'}). Previous tabs are gone; call browser_list_pages to start.`,
+                  ? `Switched to a fresh isolated browser (${next.headless === false ? 'headed' : 'headless'}). Previous tabs are gone; call browser_list_pages to start.`
+                  : `Switched to the persistent profile (${next.headless === false ? 'headed' : 'headless'}). Previous tabs are gone; call browser_list_pages to start.`,
             },
           ],
           details: undefined,
