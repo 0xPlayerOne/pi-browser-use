@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.8.1...pi-browser-use-v0.9.0) (2026-09-07)
+
+
+### Features
+
+* migrate formatting and linting from Prettier/ESLint to oxfmt/oxlint ([#23](https://github.com/0xPlayerOne/pi-browser-use/issues/23)) ([3f0634e](https://github.com/0xPlayerOne/pi-browser-use/commit/3f0634e44b9826ca68d1542096472a90048c72f7))
+
 ## [0.8.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.8.0...pi-browser-use-v0.8.1) (2026-09-06)
 
 
