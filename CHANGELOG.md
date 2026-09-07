@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.3](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.9.2...pi-browser-use-v0.9.3) (2026-09-07)
+
+
+### Bug Fixes
+
+* **ci:** pin generated callers to the adopted v1.4.1 runtime ([#31](https://github.com/0xPlayerOne/pi-browser-use/issues/31)) ([f7a9f06](https://github.com/0xPlayerOne/pi-browser-use/commit/f7a9f063622d5a0bebfcd333f88ae97a9f98b74c))
+
+
+### Maintenance
+
+* **code-foundry:** upgrade to v1.4.1 ([#28](https://github.com/0xPlayerOne/pi-browser-use/issues/28)) ([73f7ee5](https://github.com/0xPlayerOne/pi-browser-use/commit/73f7ee5786d35bd8bc3f4e7b4b404b45828d6a83))
+
 ## [0.9.2](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.9.1...pi-browser-use-v0.9.2) (2026-09-07)
 
 
