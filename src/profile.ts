@@ -54,7 +54,7 @@ export function prepareBrowserProfile(config: BrowserUseConfig): void {
     )
     try {
       renameSync(dir, aside)
-    } catch (error) {
+    } catch {
       throw new Error(
         `Browser profile at ${dir} is not accessible and could not be moved aside. ` +
           `Fix ownership with: sudo chown -R $(id -un):$(id -gn) ${JSON.stringify(dir)}`

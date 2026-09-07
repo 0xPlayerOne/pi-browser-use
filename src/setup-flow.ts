@@ -19,7 +19,7 @@
  * Launchers are injectable so the orchestration is unit-testable.
  */
 
-import { launchChrome, launchSetupBrowser, type ChromeProcess } from './chrome-launcher.js'
+import { launchSetupBrowser } from './chrome-launcher.js'
 import { ensureNamedProfile, PI_PROFILE_NAME } from './named-profile.js'
 import type { PersistentBackend } from './persistent-backend.js'
 import { markBootstrapped } from './persistent-store.js'
