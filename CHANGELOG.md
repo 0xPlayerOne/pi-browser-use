@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.9.0...pi-browser-use-v0.9.1) (2026-09-07)
+
+
+### Bug Fixes
+
+* verified shutdown, orphan reaper, existing consent hint ([#19](https://github.com/0xPlayerOne/pi-browser-use/issues/19)) ([d130a37](https://github.com/0xPlayerOne/pi-browser-use/commit/d130a3720f78838659aa901c54b2cb2b0acb6a4b))
+
 ## [0.9.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.8.1...pi-browser-use-v0.9.0) (2026-09-07)
 
 
