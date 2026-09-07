@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.9.1...pi-browser-use-v0.9.2) (2026-09-07)
+
+
+### Maintenance
+
+* adopt code-foundry v1.3.1 baseline and migrate to oxlint/oxfmt ([#26](https://github.com/0xPlayerOne/pi-browser-use/issues/26)) ([8eadf87](https://github.com/0xPlayerOne/pi-browser-use/commit/8eadf878a4622df1398c84e48f18603aa5ebd173))
+
 ## [0.9.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.9.0...pi-browser-use-v0.9.1) (2026-09-07)
 
 
