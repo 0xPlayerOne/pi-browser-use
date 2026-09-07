@@ -1,6 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 import { Type, type TSchema } from 'typebox'
 import { DevToolsClient } from './client.js'
 import {
@@ -39,7 +38,6 @@ import {
   claimPage,
   livePeerSessions,
   newSessionId,
-  pruneDeadOwners,
   releasePages,
 } from './shared-backend.js'
 import { applyNewPageDefaults, applySelectPageDefaults } from './focus-policy.js'

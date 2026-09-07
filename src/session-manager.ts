@@ -309,7 +309,10 @@ export function resolveModeForCapabilities(
 
 /** Persistent escalation sequence (spec section 24). */
 export type PersistentEscalation =
-  'headless' | 'headed-auth-then-headless' | 'headed-background' | 'suggest-existing'
+  | 'headless'
+  | 'headed-auth-then-headless'
+  | 'headed-background'
+  | 'suggest-existing'
 
 /** Next step when persistent headless cannot proceed. */
 export function nextPersistentEscalation(

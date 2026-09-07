@@ -53,7 +53,7 @@ export function seedDisplayName(profileDir: string): boolean {
     const prefs = JSON.parse(raw) as { profile?: Record<string, unknown> }
     const current = (prefs.profile ?? {}).name
     if (!isGenericName(current)) return false
-    prefs.profile = { ...(prefs.profile ?? {}), name: PI_PROFILE_DISPLAY_NAME }
+    prefs.profile = { ...prefs.profile, name: PI_PROFILE_DISPLAY_NAME }
     writeFileSync(path, JSON.stringify(prefs))
     return true
   } catch (error) {
@@ -92,7 +92,7 @@ function writeLastUsed(root: string, name: string): void {
   try {
     const raw = readFileSync(path, 'utf8')
     const state = JSON.parse(raw) as { profile?: Record<string, unknown> }
-    state.profile = { ...(state.profile ?? {}), last_used: name }
+    state.profile = { ...state.profile, last_used: name }
     writeFileSync(path, JSON.stringify(state))
   } catch {
     // Best effort: the explicit launch flag decides anyway.

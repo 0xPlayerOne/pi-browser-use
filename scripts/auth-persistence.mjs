@@ -161,7 +161,7 @@ console.log('\nSTEP 3: relaunching headed with remote debugging (Variant B shape
   results.headedCdpAuthPersisted = answer === 'y' || answer === 'yes'
   for (const site of sites) {
     results.sites[site] = {
-      ...(results.sites[site] ?? {}),
+      ...results.sites[site],
       headedCdp: results.headedCdpAuthPersisted,
     }
   }

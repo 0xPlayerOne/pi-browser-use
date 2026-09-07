@@ -16,7 +16,7 @@
  * registry adds the missing pieces: discovery, ownership, and cleanup scope.
  */
 
-import { existsSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { McpPageEntry } from './existing-flow.js'
