@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.5](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.9.4...pi-browser-use-v0.9.5) (2026-09-08)
+
+
+### Performance
+
+* complete M0 runtime and build audit ([#35](https://github.com/0xPlayerOne/pi-browser-use/issues/35)) ([55767ab](https://github.com/0xPlayerOne/pi-browser-use/commit/55767ab52a9e6502e3730c721fa23dd7e66f8d80))
+
 ## [0.9.4](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.9.3...pi-browser-use-v0.9.4) (2026-09-08)
 
 
