@@ -33,7 +33,7 @@ Budgets live in [`performance-budgets.json`](../performance-budgets.json). They 
 
 | Metric                            |        Budget |
 | --------------------------------- | ------------: |
-| Cold import / `typebox` p50 ratio |           2.0 |
+| Cold import / `typebox` p50 ratio |           3.0 |
 | Cold import maximum RSS delta     |        48 MiB |
 | npm tarball                       |  90,000 bytes |
 | npm unpacked package              | 300,000 bytes |
