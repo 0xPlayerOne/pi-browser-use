@@ -1,0 +1,36 @@
+# Temporary, branch-only workspace export for offline implementation and tests.
+# No credentials, Git metadata, or user browser profiles are included.
+name: Plugin workspace
+on:
+  push:
+    branches: [feat/agent-plugins-1]
+    paths: [.github/workflows/plugin-workspace-temp.yml]
+permissions:
+  contents: read
+concurrency:
+  group: plugin-workspace-export
+  cancel-in-progress: true
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - name: Export tracked source and locked dependencies
+        run: |
+          git archive HEAD -o "$RUNNER_TEMP/source.tar"
+          tar -czf "$RUNNER_TEMP/dependencies.tar.gz" node_modules
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: plugin-workspace
+          path: |
+            ${{ runner.temp }}/source.tar
+            ${{ runner.temp }}/dependencies.tar.gz
+          retention-days: 1
+          compression-level: 0
