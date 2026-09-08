@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.9.6...pi-browser-use-v0.10.0) (2026-09-08)
+
+
+### Features
+
+* add Agent Plugins 1.0 dual distribution and shared browser runtime ([#40](https://github.com/0xPlayerOne/pi-browser-use/issues/40)) ([86bc67d](https://github.com/0xPlayerOne/pi-browser-use/commit/86bc67d9d68e661dc94e7f47b1a195cc67a9c2f7))
+
 ## [0.9.6](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.9.5...pi-browser-use-v0.9.6) (2026-09-08)
 
 
