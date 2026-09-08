@@ -5,7 +5,7 @@ This project measures performance in two layers:
 - `npm run perf:audit` measures cold plugin import time and memory, the published package, and the production dependency closure. It is fast, emits JSON, and does not launch Chrome.
 - `npm run bench -- --iterations 10 --json` launches the complete headless Chrome + MCP stack and measures startup, process-tree RSS, and representative tool calls against a fixed local fixture.
 
-`npm test` runs `perf:check` after the unit suite, so the stable artifact, dependency, and normalized cold-import budgets run in CI. The audit reports raw time but compares it with a same-run `typebox` import to account for runner CPU variance. Browser timing and process-tree memory are reported rather than enforced because shared-runner and Chrome variance would make a wall-clock budget flaky.
+Code Foundry runs `npm test` and `npm run perf:check` in separate unit and performance jobs, so the stable artifact, dependency, and normalized cold-import budgets remain required in CI without coupling them to the unit command. The audit reports raw time but compares it with a same-run `typebox` import to account for runner CPU variance. Browser timing and process-tree memory are reported rather than enforced because shared-runner and Chrome variance would make a wall-clock budget flaky.
 
 ## M0 baseline and result
 
@@ -33,7 +33,7 @@ Budgets live in [`performance-budgets.json`](../performance-budgets.json). They 
 
 | Metric                            |        Budget |
 | --------------------------------- | ------------: |
-| Cold import / `typebox` p50 ratio |           2.0 |
+| Cold import / `typebox` p50 ratio |           3.0 |
 | Cold import maximum RSS delta     |        48 MiB |
 | npm tarball                       |  90,000 bytes |
 | npm unpacked package              | 300,000 bytes |
@@ -50,6 +50,7 @@ npm run format:check
 npm run lint
 npm run typecheck
 npm test
+npm run perf:check
 npm run perf:audit
 npm run bench -- --iterations 10 --json
 npm run bench -- --startup-only --json

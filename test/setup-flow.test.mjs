@@ -56,7 +56,14 @@ describe('runReauth', () => {
     const backend = makeBackend('/tmp/pi-profile')
     const message = await runReauth({ backend, url: 'https://mail.google.com/' })
     assert.deepEqual(backend.restarts, [true])
-    assert.ok(message.includes('https://mail.google.com/'))
+    assert.equal(
+      message,
+      [
+        'Pi needs you to verify your account for https://mail.google.com/: a browser window just opened on the Pi profile.',
+        'Complete the sign-in / verification step in that window.',
+        'When you are done, close the window (plain variant) or tell the agent to continue.',
+      ].join('\n')
+    )
   })
 
   it('plain variant opens a dependency-free window and waits for close', async () => {

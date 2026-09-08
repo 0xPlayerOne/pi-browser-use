@@ -159,7 +159,7 @@ On startup the default persistent profile is checked for accessibility. A root-o
 
 `npm run bench` times the tool stack headless over 5 iterations (fixture setup excluded, matching vercel-labs/agent-browser's scenario set). Baseline on Apple Silicon: navigate ~1ms, snapshot ~3ms, screenshot ~37ms, evaluate ~206ms, full agent-loop cycle ~422ms. Re-run on your hardware before quoting numbers.
 
-`npm run perf:audit` reports cold-import memory/time plus published package and dependency footprint; `npm test` enforces the stable regression budgets. See [Performance audit and budgets](docs/performance.md) for the M0 measurements, thresholds, and reproducible local/CI commands.
+`npm run perf:audit` reports cold-import memory/time plus published package and dependency footprint; Code Foundry's dedicated performance job enforces the stable regression budgets with `npm run perf:check`. See [Performance audit and budgets](docs/performance.md) for the M0 measurements, thresholds, and reproducible local/CI commands.
 
 ## Bundled skills
 
