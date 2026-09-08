@@ -4,7 +4,7 @@ import { countProductionDependencies, findBudgetFailures } from '../scripts/perf
 
 describe('performance budgets', () => {
   const budgets = {
-    coldImport: { p50Ms: 100, rssDeltaBytes: 40 },
+    coldImport: { relativeToTypebox: 2, rssDeltaBytes: 48 },
     package: {
       packedBytes: 90,
       unpackedBytes: 300,
@@ -18,7 +18,7 @@ describe('performance budgets', () => {
     assert.deepEqual(
       findBudgetFailures(
         {
-          coldImport: { p50Ms: 100, rssDeltaBytes: 40 },
+          coldImport: { relativeToTypebox: 2, rssDeltaBytes: 48 },
           package: {
             packedBytes: 90,
             unpackedBytes: 300,
@@ -36,7 +36,7 @@ describe('performance budgets', () => {
   it('reports every exceeded budget', () => {
     const failures = findBudgetFailures(
       {
-        coldImport: { p50Ms: 101, rssDeltaBytes: 41 },
+        coldImport: { relativeToTypebox: 2.1, rssDeltaBytes: 49 },
         package: {
           packedBytes: 91,
           unpackedBytes: 301,
@@ -48,7 +48,7 @@ describe('performance budgets', () => {
       budgets
     )
     assert.equal(failures.length, 7)
-    assert.match(failures[0], /coldImport\.p50Ms/)
+    assert.match(failures[0], /coldImport\.relativeToTypebox/)
     assert.match(failures[6], /productionDependencyCount/)
   })
 

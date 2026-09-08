@@ -20,7 +20,7 @@ function percentile(samples, fraction) {
   return sorted[Math.floor((sorted.length - 1) * fraction)]
 }
 
-function measureColdImport() {
+function measureImport(target) {
   const samples = []
   for (let index = 0; index < sampleCount; index += 1) {
     const child = spawnSync(
@@ -28,9 +28,13 @@ function measureColdImport() {
       [
         '--input-type=module',
         '--eval',
-        "const before=process.memoryUsage().rss;const start=performance.now();await import('./dist/index.js');process.stdout.write(JSON.stringify({ms:performance.now()-start,rssDeltaBytes:Math.max(0,process.memoryUsage().rss-before)}))",
+        'const before=process.memoryUsage().rss;const start=performance.now();await import(process.env.PERF_IMPORT_TARGET);process.stdout.write(JSON.stringify({ms:performance.now()-start,rssDeltaBytes:Math.max(0,process.memoryUsage().rss-before)}))',
       ],
-      { cwd: root, encoding: 'utf8' }
+      {
+        cwd: root,
+        encoding: 'utf8',
+        env: { ...process.env, PERF_IMPORT_TARGET: target },
+      }
     )
     if (child.status !== 0) {
       throw new Error(`Cold import probe failed: ${child.stderr.trim() || `exit ${child.status}`}`)
@@ -48,6 +52,16 @@ function measureColdImport() {
       0.95
     ),
     rssDeltaBytes: Math.max(...samples.map((sample) => sample.rssDeltaBytes)),
+  }
+}
+
+function measureColdImport() {
+  const plugin = measureImport('./dist/index.js')
+  const control = measureImport('typebox')
+  return {
+    ...plugin,
+    typeboxP50Ms: control.p50Ms,
+    relativeToTypebox: plugin.p50Ms / control.p50Ms,
   }
 }
 
@@ -120,7 +134,11 @@ export function countProductionDependencies(lock) {
 
 export function findBudgetFailures(metrics, budgets) {
   const checks = [
-    ['coldImport.p50Ms', metrics.coldImport.p50Ms, budgets.coldImport.p50Ms],
+    [
+      'coldImport.relativeToTypebox',
+      metrics.coldImport.relativeToTypebox,
+      budgets.coldImport.relativeToTypebox,
+    ],
     [
       'coldImport.rssDeltaBytes',
       metrics.coldImport.rssDeltaBytes,
@@ -138,7 +156,10 @@ export function findBudgetFailures(metrics, budgets) {
   ]
   return checks
     .filter(([, actual, budget]) => actual > budget)
-    .map(([name, actual, budget]) => `${name}: ${Math.round(actual)} > ${budget}`)
+    .map(([name, actual, budget]) => {
+      const displayed = Number.isInteger(actual) ? actual : actual.toFixed(2)
+      return `${name}: ${displayed} > ${budget}`
+    })
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

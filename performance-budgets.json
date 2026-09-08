@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "coldImport": {
-    "p50Ms": 100,
-    "rssDeltaBytes": 41943040
+    "relativeToTypebox": 2,
+    "rssDeltaBytes": 50331648
   },
   "package": {
     "packedBytes": 90000,
