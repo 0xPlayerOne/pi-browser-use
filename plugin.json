@@ -8,5 +8,11 @@
   },
   "repository": "https://github.com/0xPlayerOne/pi-browser-use",
   "license": "MIT",
-  "keywords": ["browser", "chrome", "mcp", "agent-skills", "pi"]
+  "keywords": [
+    "browser",
+    "chrome",
+    "mcp",
+    "agent-skills",
+    "pi"
+  ]
 }
