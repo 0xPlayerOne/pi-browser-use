@@ -1,0 +1,85 @@
+# Temporary branch-only application of the locally tested source delta.
+name: Apply browser implementation
+
+on:
+  push:
+    branches: [feat/agent-plugins-1]
+    paths: [.github/workflows/plugin-apply-temp.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: browser-implementation-transfer
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: feat/agent-plugins-1
+          fetch-depth: 0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+      - name: Verify and apply source delta
+        run: |
+          git merge-base --is-ancestor fe5acd9f967e12128853a1ebdc6eb387b62e8b4b HEAD
+          test -z "$(git status --porcelain)"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+          import { dirname } from 'node:path';
+          import { createHash } from 'node:crypto';
+          import { brotliDecompressSync } from 'node:zlib';
+          const hash = (data) => createHash('sha256').update(data).digest('hex');
+          const encoded = [0, 1, 2, 3].map((i) => readFileSync(`.github/plugin-transfer/${i}.b64`, 'utf8').trim()).join('');
+          const raw = brotliDecompressSync(Buffer.from(encoded, 'base64'));
+          assert.equal(hash(raw), '0cd5de8d014e3692a2c1a8f72f639a5e10bbbd1af3c871a7741f8698ae004ec0');
+          const delta = JSON.parse(raw);
+          const allowed = new Set([
+            'README.md', 'docs/agent-plugins.md', 'package.json', 'release-please-config.json',
+            'scripts/plugin-smoke.mjs', 'skills/auth-bootstrap/SKILL.md', 'skills/browser-policy/SKILL.md',
+            'skills/gmail-auth/SKILL.md', 'src/artifacts.ts', 'src/chrome-launcher.ts', 'src/client.ts',
+            'src/config.ts', 'src/existing-flow.ts', 'src/index.ts', 'src/mcp-server.ts',
+            'src/persistent-backend.ts', 'src/profile-lock.ts', 'src/runtime.ts', 'src/setup-flow.ts',
+            'test/browser-infra.test.mjs', 'test/mcp-server.test.mjs', 'test/persistent-backend.test.mjs',
+            'test/pi-adapter.test.mjs', 'test/recover.test.mjs', 'test/runtime.test.mjs',
+            'test/session-manager.test.mjs', 'test/setup-flow.test.mjs',
+          ]);
+          assert.equal(delta.length, allowed.size);
+          assert.equal(new Set(delta.map((file) => file.path)).size, allowed.size);
+          // Read ALL originals before replacing index.ts: runtime.ts derives from its original.
+          const outputs = delta.map((file) => {
+            assert(allowed.has(file.path));
+            assert(file.source === null || allowed.has(file.source));
+            let data = file.source === null ? Buffer.alloc(0) : readFileSync(file.source);
+            assert.equal(hash(data), file.sourceSha, `Source changed: ${file.source}`);
+            for (const [start, end, text] of [...file.edits].reverse()) {
+              assert(Number.isInteger(start) && Number.isInteger(end));
+              assert(start >= 0 && end >= start && end <= data.length);
+              data = Buffer.concat([data.subarray(0, start), Buffer.from(text, 'utf8'), data.subarray(end)]);
+            }
+            assert.equal(hash(data), file.targetSha, `Output mismatch: ${file.path}`);
+            return [file.path, data];
+          });
+          for (const [path, data] of outputs) {
+            mkdirSync(dirname(path), { recursive: true });
+            writeFileSync(path, data);
+          }
+          console.log(`Applied ${outputs.length} checksum-verified source files.`);
+          NODE
+      - run: npm ci
+      - run: npm run typecheck && npm run lint && npm test && npm run test:smoke
+      - name: Commit only verified application files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md docs/agent-plugins.md package.json release-please-config.json scripts/plugin-smoke.mjs skills src test
+          git diff --cached --check
+          git commit -m "feat: add host-neutral browser runtime and Agent Plugins MCP adapter"
+          git push origin HEAD:feat/agent-plugins-1
