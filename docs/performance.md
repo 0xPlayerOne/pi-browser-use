@@ -11,15 +11,15 @@ This project measures performance in two layers:
 
 Measured on Apple Silicon, macOS, Node 22.23.1, using seven fresh Node processes for cold import and ten iterations for browser operations. The baseline is `317a3aa` (`main` before M0).
 
-| Metric                                     |      Baseline |     M0 result | Change |
-| ------------------------------------------ | ------------: | ------------: | -----: |
-| Cold plugin import p50                     |      123.5 ms |       70.5 ms | -42.9% |
-| Cold import maximum RSS delta              |       49.9 MB |       33.8 MB | -32.3% |
-| npm tarball                                |      107.9 KB |       79.7 KB | -26.1% |
-| npm unpacked package                       |      406.0 KB |      270.0 KB | -33.5% |
-| Published files                            |           106 |            63 | -40.6% |
-| Clean production install package manifests |           373 |           113 | -69.7% |
-| Clean production install size              |   292,012 KiB |    46,728 KiB | -84.0% |
+| Metric                                     |    Baseline |  M0 result | Change |
+| ------------------------------------------ | ----------: | ---------: | -----: |
+| Cold plugin import p50                     |    123.5 ms |    70.5 ms | -42.9% |
+| Cold import maximum RSS delta              |     49.9 MB |    33.8 MB | -32.3% |
+| npm tarball                                |    107.9 KB |    79.7 KB | -26.1% |
+| npm unpacked package                       |    406.0 KB |   270.0 KB | -33.5% |
+| Published files                            |         106 |         63 | -40.6% |
+| Clean production install package manifests |         373 |        113 | -69.7% |
+| Clean production install size              | 292,012 KiB | 46,728 KiB | -84.0% |
 
 The cold-import gain comes from loading the MCP SDK only when a browser connection is opened. The package gains come from publishing executable JavaScript and declarations without build maps, and from marking Pi host packages as optional peers so npm does not install a second host runtime for standalone package inspection.
 
