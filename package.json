@@ -50,8 +50,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build",
     "bench": "node scripts/bench.mjs",
-    "test": "npm run test:unit && npm run perf:check",
-    "test:unit": "node --test test/*.test.mjs",
+    "test": "node --test test/*.test.mjs && npm run perf:check",
     "perf:audit": "node scripts/performance.mjs",
     "perf:check": "node scripts/performance.mjs --check",
     "pretest": "npm run build"

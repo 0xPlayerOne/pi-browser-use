@@ -15,8 +15,8 @@ Measured on Apple Silicon, macOS, Node 22.23.1, using seven fresh Node processes
 | ------------------------------------------ | ------------: | ------------: | -----: |
 | Cold plugin import p50                     |      123.5 ms |       70.5 ms | -42.9% |
 | Cold import maximum RSS delta              |       49.9 MB |       33.8 MB | -32.3% |
-| npm tarball                                | 107,883 bytes |  79,679 bytes | -26.1% |
-| npm unpacked package                       | 405,975 bytes | 270,008 bytes | -33.5% |
+| npm tarball                                | 107,883 bytes |  79,655 bytes | -26.2% |
+| npm unpacked package                       | 405,975 bytes | 269,937 bytes | -33.5% |
 | Published files                            |           106 |            63 | -40.6% |
 | Clean production install package manifests |           373 |           113 | -69.7% |
 | Clean production install size              |   292,012 KiB |    46,728 KiB | -84.0% |
