@@ -7,9 +7,10 @@
  * iterations. Measures the extension + MCP + Chrome stack, not the network:
  * the fixture is injected, only `navigate` touches the network (about:blank).
  *
- * Usage: node scripts/bench.mjs [--iterations 5] [--headless]
+ * Usage: node scripts/bench.mjs [--iterations 5] [--headed] [--json] [--startup-only]
  */
 import { DevToolsClient } from '../dist/client.js'
+import { spawnSync } from 'node:child_process'
 
 // Static fixture injector. Kept as one literal with no string building at
 // the call site: the page under test is fixed test data, never influenced by
@@ -21,9 +22,53 @@ const INJECT_FUNCTION =
 const args = process.argv.slice(2)
 const iterations = Number(args[args.indexOf('--iterations') + 1] ?? 5) || 5
 const headless = !args.includes('--headed')
+const json = args.includes('--json')
+const startupOnly = args.includes('--startup-only')
+
+function processTreeRssBytes(rootPid) {
+  const ps = spawnSync('ps', ['-axo', 'pid=,ppid=,rss='], { encoding: 'utf8' })
+  if (ps.status !== 0) return undefined
+  const rows = ps.stdout
+    .trim()
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/).map(Number))
+    .filter(([pid, parentPid, rss]) => pid > 0 && parentPid >= 0 && rss >= 0)
+  const descendants = new Set([rootPid])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const [pid, parentPid] of rows) {
+      if (descendants.has(parentPid) && !descendants.has(pid)) {
+        descendants.add(pid)
+        changed = true
+      }
+    }
+  }
+  return rows
+    .filter(([pid]) => descendants.has(pid))
+    .reduce((total, [, , rss]) => total + rss * 1024, 0)
+}
 
 const client = new DevToolsClient({ sessionMode: 'isolated', headless })
+const startupStarted = performance.now()
 await client.connect()
+const startupMs = performance.now() - startupStarted
+const processTreeRss = processTreeRssBytes(process.pid)
+
+if (startupOnly) {
+  await client.close()
+  if (json) {
+    console.log(
+      JSON.stringify({ headless, startupMs, processTreeRssBytes: processTreeRss }, null, 2)
+    )
+  } else {
+    console.log(`startup: ${Math.round(startupMs)} ms`)
+    if (processTreeRss !== undefined) {
+      console.log(`process tree RSS: ${Math.round(processTreeRss / 1024 / 1024)} MiB`)
+    }
+  }
+  process.exit(0)
+}
 
 async function setupPage() {
   const pages = await client.callTool('list_pages', {})
@@ -72,7 +117,7 @@ const scenarios = {
 }
 
 function stats(samples) {
-  const sorted = [...samples].sort((a, b) => a - b)
+  const sorted = samples.toSorted((a, b) => a - b)
   const mean = samples.reduce((a, b) => a + b, 0) / samples.length
   return { mean, p50: sorted[Math.floor(sorted.length / 2)], max: sorted[sorted.length - 1] }
 }
@@ -109,10 +154,24 @@ for (const [name, scenario] of Object.entries(scenarios)) {
 await client.close()
 
 const pad = (s, n) => String(s).padEnd(n)
-console.log(`\npi-browser-use bench (${iterations} iterations, headless: ${headless})`)
-console.log(`${pad('scenario', 14)}${pad('mean ms', 10)}${pad('p50 ms', 10)}max ms`)
-for (const [name, s] of Object.entries(results)) {
+if (json) {
   console.log(
-    `${pad(name, 14)}${pad(Math.round(s.mean), 10)}${pad(Math.round(s.p50), 10)}${Math.round(s.max)}`
+    JSON.stringify(
+      { iterations, headless, startupMs, processTreeRssBytes: processTreeRss, scenarios: results },
+      null,
+      2
+    )
   )
+} else {
+  console.log(`\npi-browser-use bench (${iterations} iterations, headless: ${headless})`)
+  console.log(`startup: ${Math.round(startupMs)} ms`)
+  if (processTreeRss !== undefined) {
+    console.log(`process tree RSS: ${Math.round(processTreeRss / 1024 / 1024)} MiB`)
+  }
+  console.log(`${pad('scenario', 14)}${pad('mean ms', 10)}${pad('p50 ms', 10)}max ms`)
+  for (const [name, s] of Object.entries(results)) {
+    console.log(
+      `${pad(name, 14)}${pad(Math.round(s.mean), 10)}${pad(Math.round(s.p50), 10)}${Math.round(s.max)}`
+    )
+  }
 }

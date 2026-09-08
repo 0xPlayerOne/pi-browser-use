@@ -22,7 +22,9 @@
     "url": "https://github.com/0xPlayerOne/pi-browser-use.git"
   },
   "files": [
-    "dist",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "docs/performance.md",
     "extension",
     "skills",
     "README.md"
@@ -42,13 +44,16 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prebuild": "tsc -b --clean tsconfig.json",
     "format:check": "oxfmt --check .",
     "fmt": "oxfmt .",
     "lint": "oxlint",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build",
     "bench": "node scripts/bench.mjs",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test test/*.test.mjs && npm run perf:check",
+    "perf:audit": "node scripts/performance.mjs",
+    "perf:check": "node scripts/performance.mjs --check",
     "pretest": "npm run build"
   },
   "dependencies": {
@@ -66,6 +71,14 @@
   "peerDependencies": {
     "@earendil-works/pi-ai": ">=0.80.10",
     "@earendil-works/pi-coding-agent": ">=0.80.10"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-ai": {
+      "optional": true
+    },
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    }
   },
   "engines": {
     "node": "^20.19.0 || ^22.12.0 || >=23"

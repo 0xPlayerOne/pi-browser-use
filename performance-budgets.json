@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "coldImport": {
+    "relativeToTypebox": 2,
+    "rssDeltaBytes": 50331648
+  },
+  "package": {
+    "packedBytes": 90000,
+    "unpackedBytes": 300000,
+    "fileCount": 70,
+    "mapFileCount": 0,
+    "productionDependencyCount": 140
+  }
+}
