@@ -1,7 +1,6 @@
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { configToArgs, resolveConfig, type BrowserUseConfig } from './config.js'
 
 const MCP_TIMEOUT_MS = 60_000
@@ -25,6 +24,14 @@ const CHROME_DEVTOOLS_MCP_ENTRYPOINT = join(
   dirname(chromeDevToolsMcpPackagePath),
   chromeDevToolsMcpBin
 )
+
+async function loadMcpRuntime() {
+  const [{ Client }, { StdioClientTransport }] = await Promise.all([
+    import('@modelcontextprotocol/sdk/client/index.js'),
+    import('@modelcontextprotocol/sdk/client/stdio.js'),
+  ])
+  return { Client, StdioClientTransport }
+}
 
 function safeSystemErrorCode(value: unknown): string | undefined {
   return typeof value === 'string' && MCP_SYSTEM_ERROR_CODE_PATTERN.test(value) ? value : undefined
@@ -80,6 +87,9 @@ export class DevToolsClient {
 
   private async openConnection(signal?: AbortSignal): Promise<void> {
     this.state = this.hasConnected ? 'reconnecting' : 'connecting'
+    // Keep the MCP SDK off the extension's eager module-evaluation path and
+    // pay its cost only when session initialization opens a connection.
+    const { Client, StdioClientTransport } = await loadMcpRuntime()
     const args = configToArgs(this.config)
     const generation = ++this.generation
     const transport = new StdioClientTransport({
