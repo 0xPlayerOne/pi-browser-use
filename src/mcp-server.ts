@@ -1,7 +1,7 @@
-import { mkdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { isAbsolute, join, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { isAbsolute, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
@@ -230,7 +230,11 @@ export async function runStdio(): Promise<void> {
   }
 }
 
-if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+// Canonical paths handle macOS /var vs /private/var aliases in packed installs.
+if (
+  process.argv[1] &&
+  realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))
+) {
   if (process.argv.includes('--help')) {
     console.error(
       'pi-browser-use MCP server (stdio). Configure ${PLUGIN_DATA}/config.json or PI_BROWSER_USE_CONFIG. No Pi installation is required.'

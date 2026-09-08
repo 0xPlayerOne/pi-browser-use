@@ -142,7 +142,12 @@ export class TabBridge {
     const pollMs = options?.pollMs ?? 100
     const deadline = Date.now() + timeoutMs
     while (Date.now() < deadline) {
-      if (options?.signal?.aborted) throw new Error('Tab wait aborted.')
+      if (options?.signal?.aborted) {
+        // Do not leave a cancelled request for the extension to consume; it
+        // would create an unmanaged tab after the caller has given up.
+        this.pending.delete(token)
+        throw new Error('Tab wait aborted.')
+      }
       const done = this.completed.get(token)
       if (done) {
         this.completed.delete(token)

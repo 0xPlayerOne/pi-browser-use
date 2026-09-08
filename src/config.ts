@@ -123,11 +123,21 @@ export function resolveModeTarget(
     return { ...freshRest, sessionMode: 'isolated', headless: !headed, isolated: true }
   }
   if (mode === 'existing') {
-    // Attach to the user's running Chrome: drop Pi-owned launch fields so
-    // MCP auto-connects instead of starting its own browser.
-    const { userDataDir: _userDataDir, isolated: _isolated, ...existingRest } = rest
+    // Attach to the user's running Chrome: drop launch-only fields so MCP
+    // auto-connects instead of trying to start or reconfigure its browser.
+    const {
+      userDataDir: _userDataDir,
+      isolated: _isolated,
+      executablePath: _executablePath,
+      chromeArgs: _chromeArgs,
+      viewport: _viewport,
+      ...existingRest
+    } = rest
     void _userDataDir
     void _isolated
+    void _executablePath
+    void _chromeArgs
+    void _viewport
     // Existing attaches to the user's visible Chrome: always headed.
     return { ...existingRest, sessionMode: 'existing', headless: false, autoConnect: true }
   }
