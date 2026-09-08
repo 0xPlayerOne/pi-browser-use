@@ -20,6 +20,7 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { createServer } from 'node:net'
+import { setTimeout as delay } from 'node:timers/promises'
 
 export interface ChromeLaunchOptions {
   userDataDir: string
@@ -33,6 +34,7 @@ export interface ChromeLaunchOptions {
   executablePath?: string
   /** How long to wait for the DevTools endpoint. Default 15s. */
   readyTimeoutMs?: number
+  signal?: AbortSignal
 }
 
 export interface ChromeProcess {
@@ -161,7 +163,7 @@ export function buildChromeArgs(options: {
 /** Poll the DevTools `/json/version` endpoint until it answers or times out. */
 export async function waitForDevToolsEndpoint(
   port: number,
-  options?: { timeoutMs?: number; fetchImpl?: typeof fetch }
+  options?: { timeoutMs?: number; fetchImpl?: typeof fetch; signal?: AbortSignal }
 ): Promise<{ browserUrl: string; webSocketDebuggerUrl: string }> {
   const timeoutMs = options?.timeoutMs ?? 15_000
   const fetchImpl = options?.fetchImpl ?? fetch
@@ -169,17 +171,21 @@ export async function waitForDevToolsEndpoint(
   const deadline = Date.now() + timeoutMs
   let lastError: unknown
   while (Date.now() < deadline) {
+    options?.signal?.throwIfAborted()
     try {
-      const response = await fetchImpl(`${browserUrl}/json/version`)
+      const timeout = AbortSignal.timeout(Math.max(1, Math.min(1000, deadline - Date.now())))
+      const signal = options?.signal ? AbortSignal.any([options.signal, timeout]) : timeout
+      const response = await fetchImpl(`${browserUrl}/json/version`, { signal })
       if (response.ok) {
         const info = (await response.json()) as { webSocketDebuggerUrl?: string }
         return { browserUrl, webSocketDebuggerUrl: info.webSocketDebuggerUrl ?? '' }
       }
       lastError = new Error(`DevTools endpoint answered ${response.status}`)
     } catch (error) {
+      options?.signal?.throwIfAborted()
       lastError = error
     }
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await delay(100, undefined, { signal: options?.signal })
   }
   throw new Error(
     `Timed out waiting for Chrome DevTools on ${browserUrl} (${lastError instanceof Error ? lastError.message : String(lastError)})`
@@ -245,6 +251,7 @@ class OwnedChromeProcess implements ChromeProcess {
  * (see `profile-lock.ts`) for `userDataDir` before calling.
  */
 export async function launchChrome(options: ChromeLaunchOptions): Promise<ChromeProcess> {
+  options.signal?.throwIfAborted()
   const executable = findChromeExecutable(options.executablePath)
   const port = options.port ?? (await allocateEphemeralPort())
   const args = buildChromeArgs({
@@ -264,7 +271,10 @@ export async function launchChrome(options: ChromeLaunchOptions): Promise<Chrome
     throw new Error(`Chrome exited immediately (code ${child.exitCode}).`)
   }
   try {
-    await waitForDevToolsEndpoint(port, { timeoutMs: options.readyTimeoutMs })
+    await waitForDevToolsEndpoint(port, {
+      timeoutMs: options.readyTimeoutMs,
+      signal: options.signal,
+    })
   } catch (error) {
     try {
       child.kill('SIGKILL')
@@ -337,7 +347,9 @@ export async function launchSetupBrowser(options: {
   profileDirectory?: string
   executablePath?: string
   chromeArgs?: string[]
+  signal?: AbortSignal
 }): Promise<number | null> {
+  options.signal?.throwIfAborted()
   const executable = findChromeExecutable(options.executablePath)
   const args = buildChromeArgs({
     userDataDir: options.userDataDir,
@@ -345,8 +357,31 @@ export async function launchSetupBrowser(options: {
     chromeArgs: options.chromeArgs,
   })
   const child = spawn(executable, args, { stdio: 'ignore', detached: false })
+  const browser = new OwnedChromeProcess(child, 0, '', options.userDataDir)
   return new Promise((resolve, reject) => {
-    child.on('error', reject)
-    child.on('exit', (code) => resolve(code))
+    const cleanup = () => options.signal?.removeEventListener('abort', abort)
+    const abort = () => {
+      void browser.shutdown().then(
+        () => {
+          cleanup()
+          reject(options.signal?.reason ?? new Error('Browser setup aborted.'))
+        },
+        (error) => {
+          cleanup()
+          reject(error)
+        }
+      )
+    }
+    child.once('error', (error) => {
+      cleanup()
+      reject(error)
+    })
+    child.once('exit', (code) => {
+      cleanup()
+      if (options.signal?.aborted) reject(options.signal.reason)
+      else resolve(code)
+    })
+    options.signal?.addEventListener('abort', abort, { once: true })
+    if (options.signal?.aborted) abort()
   })
 }

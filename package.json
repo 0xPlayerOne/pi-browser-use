@@ -1,7 +1,7 @@
 {
   "name": "pi-browser-use",
   "version": "0.9.6",
-  "description": "Opinionated browser-use for the Pi coding agent, powered by chrome-devtools-mcp (not Playwright). Fresh headless by default, authenticated persistent profile opt-in, CLI-first policy bundled.",
+  "description": "Opinionated browser automation via chrome-devtools-mcp: native Pi extension and portable Agent Plugins 1.0 skills + MCP server.",
   "keywords": [
     "automation",
     "browser",
@@ -27,7 +27,10 @@
     "docs/performance.md",
     "extension",
     "skills",
-    "README.md"
+    "README.md",
+    "plugin.json",
+    "mcp.json",
+    "docs/agent-plugins.md"
   ],
   "type": "module",
   "sideEffects": false,
@@ -56,7 +59,9 @@
     "perf:audit": "node scripts/performance.mjs",
     "preperf:check": "npm run build",
     "perf:check": "node scripts/performance.mjs --check",
-    "pretest": "npm run build"
+    "pretest": "npm run build",
+    "test:smoke": "npm run build && node scripts/plugin-smoke.mjs",
+    "test:browser": "npm run build && node scripts/plugin-smoke.mjs --browser"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

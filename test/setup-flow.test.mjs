@@ -39,19 +39,19 @@ describe('runBootstrap', () => {
   })
 })
 
-describe('runReauth', () => {
-  function makeBackend(profileDir) {
-    return {
-      restarts: [],
-      profileDir: () => profileDir,
-      restart: async function (headed) {
-        this.restarts.push(headed)
-        return {}
-      },
-      running: () => true,
-    }
+function makeBackend(profileDir) {
+  return {
+    restarts: [],
+    profileDir: () => profileDir,
+    restart: async function (headed) {
+      this.restarts.push(headed)
+      return {}
+    },
+    running: () => true,
   }
+}
 
+describe('runReauth', () => {
   it('instrumented variant restarts headed with CDP and returns handoff text', async () => {
     const backend = makeBackend('/tmp/pi-profile')
     const message = await runReauth({ backend, url: 'https://mail.google.com/' })
@@ -97,4 +97,57 @@ describe('resumeHeadless', () => {
     assert.equal(await resumeHeadless(backend), true)
     assert.deepEqual(restarts, [false])
   })
+})
+
+it('cancelled or failed bootstrap never marks a profile initialized', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'browser-setup-failure-'))
+  const profile = join(dir, 'profile')
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  await assert.rejects(
+    runBootstrap({ profileDir: profile, launch: async () => 1 }),
+    /did not complete/
+  )
+  assert.equal(loadPersistentMetadata(profile).initialized, false)
+  const controller = new AbortController()
+  await assert.rejects(
+    runBootstrap({
+      profileDir: profile,
+      signal: controller.signal,
+      launch: async ({ signal }) => {
+        assert.equal(signal, controller.signal)
+        controller.abort(new Error('setup cancelled'))
+        return 0
+      },
+    }),
+    /setup cancelled/
+  )
+  assert.equal(loadPersistentMetadata(profile).initialized, false)
+})
+
+it('plain reauth keeps explicit Chrome settings and does not report failed verification as complete', async () => {
+  const controller = new AbortController()
+  let completed = false
+  await assert.rejects(
+    runReauth({
+      backend: makeBackend('/tmp/browser-fixture'),
+      url: 'https://example.test/',
+      variant: 'plain',
+      executablePath: '/tmp/custom-chrome',
+      chromeArgs: ['--disable-gpu'],
+      signal: controller.signal,
+      launchPlain: async (options) => {
+        assert.equal(options.executablePath, '/tmp/custom-chrome')
+        assert.deepEqual(options.chromeArgs, ['--disable-gpu'])
+        assert.equal(options.signal, controller.signal)
+        return 1
+      },
+      events: {
+        onReauthComplete: () => {
+          completed = true
+        },
+      },
+    }),
+    /did not complete/
+  )
+  assert.equal(completed, false)
 })

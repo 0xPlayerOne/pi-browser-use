@@ -8,9 +8,13 @@ export function defaultArtifactDir(): string {
 }
 
 /** Resolve the destination file: explicit path wins, otherwise a timestamped file in the default dir. */
-export function resolveArtifactTarget(kind: ArtifactKind, path?: unknown): string {
+export function resolveArtifactTarget(
+  kind: ArtifactKind,
+  path?: unknown,
+  directory = defaultArtifactDir()
+): string {
   if (typeof path === 'string' && path.length > 0) return path
-  return join(defaultArtifactDir(), `page-${Date.now()}.${kind === 'html' ? 'html' : 'png'}`)
+  return join(directory, `page-${Date.now()}.${kind === 'html' ? 'html' : 'png'}`)
 }
 
 interface ContentItem {

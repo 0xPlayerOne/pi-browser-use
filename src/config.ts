@@ -99,11 +99,13 @@ export type BrowserMode = 'fresh' | 'persistent' | 'existing'
 export function resolveModeTarget(
   base: BrowserUseConfig,
   mode: BrowserMode,
-  headed = false
+  headed = false,
+  defaultProfileDir = DEFAULT_PROFILE_DIR
 ): BrowserUseConfig {
   const {
     browserUrl: _browserUrl,
     wsEndpoint: _wsEndpoint,
+    wsHeaders: _wsHeaders,
     autoConnect: _autoConnect,
     mode: _mode,
     headed: _headed,
@@ -111,6 +113,7 @@ export function resolveModeTarget(
   } = base
   void _browserUrl
   void _wsEndpoint
+  void _wsHeaders
   void _autoConnect
   void _mode
   void _headed
@@ -133,7 +136,7 @@ export function resolveModeTarget(
     sessionMode: 'persistent',
     headless: !headed,
     isolated: false,
-    userDataDir: base.userDataDir ?? DEFAULT_PROFILE_DIR,
+    userDataDir: base.userDataDir ?? defaultProfileDir,
   }
 }
 
@@ -143,7 +146,10 @@ export function expandHome(path: string): string {
 }
 
 /** Merge user config over fresh-headless defaults. */
-export function resolveConfig(config?: BrowserUseConfig): BrowserUseConfig {
+export function resolveConfig(
+  config?: BrowserUseConfig,
+  defaultProfileDir = DEFAULT_PROFILE_DIR
+): BrowserUseConfig {
   const { mode, headed, ...rest } = config ?? {}
   const resolved: BrowserUseConfig = { ...DEFAULTS, ...rest }
   if (typeof resolved.userDataDir === 'string')
@@ -191,7 +197,7 @@ export function resolveConfig(config?: BrowserUseConfig): BrowserUseConfig {
       break
     default:
       if (!resolved.userDataDir && !resolved.browserUrl && !resolved.wsEndpoint) {
-        resolved.userDataDir = DEFAULT_PROFILE_DIR
+        resolved.userDataDir = defaultProfileDir
       }
       break
   }

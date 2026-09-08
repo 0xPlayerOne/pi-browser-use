@@ -16,6 +16,16 @@ import {
 import { BrowserAuthRequired } from '../dist/session.js'
 import { PI_GROUP_TITLE } from '../dist/focus-policy.js'
 
+function makeManager() {
+  const fresh = new FreshSession(createMemoryTransport())
+  const persistent = new PersistentSession({
+    transport: createMemoryTransport(),
+    metadata: { initialized: true, profilePath: '/tmp/pi-profile' },
+  })
+  const existing = new ExistingSession(createMemoryTransport())
+  return new BrowserSessionManager({ fresh, persistent, existing })
+}
+
 describe('nextPersistentState', () => {
   it('walks the bootstrap lifecycle to READY', () => {
     assert.equal(nextPersistentState('UNINITIALIZED', 'bootstrap-needed'), 'SETUP_REQUIRED')
@@ -119,16 +129,6 @@ describe('capability resolution and fallback hierarchy', () => {
 })
 
 describe('BrowserSessionManager', () => {
-  function makeManager() {
-    const fresh = new FreshSession(createMemoryTransport())
-    const persistent = new PersistentSession({
-      transport: createMemoryTransport(),
-      metadata: { initialized: true, profilePath: '/tmp/pi-profile' },
-    })
-    const existing = new ExistingSession(createMemoryTransport())
-    return new BrowserSessionManager({ fresh, persistent, existing })
-  }
-
   it('starts fresh and switches modes', async () => {
     const manager = makeManager()
     assert.equal(manager.getMode(), 'fresh')

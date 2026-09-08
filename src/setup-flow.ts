@@ -65,15 +65,18 @@ export async function runBootstrap(
     profileDir?: string
     executablePath?: string
     chromeArgs?: string[]
+    signal?: AbortSignal
     launch?: (options: {
       userDataDir: string
       profileDirectory?: string
       executablePath?: string
       chromeArgs?: string[]
+      signal?: AbortSignal
     }) => Promise<number | null>
   },
   events?: SetupFlowEvents
 ): Promise<number | null> {
+  options.signal?.throwIfAborted()
   const profileDir = options.profileDir ?? DEFAULT_PROFILE_DIR
   events?.onSetupNeeded?.(SETUP_INSTRUCTIONS)
   // Same named identity automation uses: sign in here, automate there.
@@ -84,23 +87,30 @@ export async function runBootstrap(
     profileDirectory: PI_PROFILE_NAME,
     executablePath: options.executablePath,
     chromeArgs: options.chromeArgs,
+    signal: options.signal,
   })
+  options.signal?.throwIfAborted()
+  if (code !== 0) throw new Error(`Browser setup did not complete successfully (exit ${code}).`)
   markBootstrapped(profileDir)
   events?.onSetupComplete?.(profileDir)
   return code
 }
 
 export interface ReauthOptions {
-  backend: PersistentBackend
+  backend: Pick<PersistentBackend, 'profileDir' | 'restart'>
   /** Page that needs auth (used for messaging + Variant B navigation hint). */
   url: string
   variant?: ReauthVariant
+  signal?: AbortSignal
+  executablePath?: string
+  chromeArgs?: string[]
   /** Plain-variant launcher (no CDP). Defaults to launchSetupBrowser. */
   launchPlain?: (options: {
     userDataDir: string
     profileDirectory?: string
     executablePath?: string
     chromeArgs?: string[]
+    signal?: AbortSignal
   }) => Promise<number | null>
   /** Restart the backend headed/headless (Variant B + resume). */
   restartBackend?: (headed: boolean) => Promise<unknown>
@@ -115,13 +125,23 @@ export interface ReauthOptions {
  * and waits for close. Returns the user-facing instruction to relay.
  */
 export async function runReauth(options: ReauthOptions): Promise<string> {
+  options.signal?.throwIfAborted()
   const variant = options.variant ?? 'instrumented'
   const profileDir = options.backend.profileDir?.() ?? DEFAULT_PROFILE_DIR
   const message = reauthInstructions(options.url, variant)
   options.events?.onReauthNeeded?.(message)
   if (variant === 'plain') {
     const launch = options.launchPlain ?? launchSetupBrowser
-    await launch({ userDataDir: profileDir, profileDirectory: PI_PROFILE_NAME })
+    const code = await launch({
+      userDataDir: profileDir,
+      profileDirectory: PI_PROFILE_NAME,
+      executablePath: options.executablePath,
+      chromeArgs: options.chromeArgs,
+      signal: options.signal,
+    })
+    options.signal?.throwIfAborted()
+    if (code !== 0)
+      throw new Error(`Browser verification did not complete successfully (exit ${code}).`)
   } else {
     if (options.restartBackend) {
       await options.restartBackend(true)
@@ -129,6 +149,7 @@ export async function runReauth(options: ReauthOptions): Promise<string> {
       await options.backend.restart(true)
     }
   }
+  options.signal?.throwIfAborted()
   options.events?.onReauthComplete?.(profileDir)
   return message
 }

@@ -240,3 +240,63 @@ describe('chrome launcher helpers', () => {
     assert.ok(chromeExecutableCandidates().length > 0)
   })
 })
+
+it('a live profile holder is never evicted because its lock is old', async (t) => {
+  const { writeFileSync } = await import('node:fs')
+  const dir = mkdtempSync(join(tmpdir(), 'browser-live-lock-'))
+  const profile = join(dir, 'identity')
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  writeFileSync(
+    lockPathFor(profile),
+    JSON.stringify({ pid: process.pid, createdAt: new Date(0).toISOString() })
+  )
+  assert.throws(() => acquireProfileLock(profile), ProfileLockedError)
+  assert.equal(isProfileLocked(profile), true)
+})
+
+it('DevTools endpoint polling propagates cancellation rather than waiting for timeout', async () => {
+  const controller = new AbortController()
+  const pending = waitForDevToolsEndpoint(1, {
+    signal: controller.signal,
+    timeoutMs: 60000,
+    fetchImpl: async () => {
+      controller.abort(new Error('poll cancelled'))
+      throw new Error('offline')
+    },
+  })
+  await assert.rejects(pending, /poll cancelled/)
+})
+
+it(
+  'cancelling a plain setup closes its owned process',
+  { skip: process.platform === 'win32' },
+  async (t) => {
+    const { existsSync, readFileSync, writeFileSync } = await import('node:fs')
+    const { launchSetupBrowser } = await import('../dist/chrome-launcher.js')
+    const dir = mkdtempSync(join(tmpdir(), 'browser-plain-cancel-'))
+    t.after(() => rmSync(dir, { recursive: true, force: true }))
+    const fake = join(dir, 'fake-chrome')
+    const pidFile = join(dir, 'pid')
+    writeFileSync(fake, `#!/bin/sh\nprintf '%s' "$$" > '${pidFile}'\nexec sleep 60\n`, {
+      mode: 0o755,
+    })
+    const controller = new AbortController()
+    const pending = launchSetupBrowser({
+      userDataDir: join(dir, 'profile'),
+      executablePath: fake,
+      signal: controller.signal,
+    })
+    const rejected = assert.rejects(pending, /setup cancelled/)
+    t.after(() => controller.abort(new Error('setup cancelled')))
+    for (let attempt = 0; !existsSync(pidFile) && attempt < 100; attempt++)
+      await new Promise((done) => setTimeout(done, 10))
+    assert.ok(existsSync(pidFile))
+    const pid = Number(readFileSync(pidFile, 'utf8'))
+    controller.abort(new Error('setup cancelled'))
+    await rejected
+    assert.throws(
+      () => process.kill(pid, 0),
+      (error) => error.code === 'ESRCH'
+    )
+  }
+)

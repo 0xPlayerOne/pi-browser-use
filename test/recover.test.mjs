@@ -75,7 +75,7 @@ describe('mode facade', () => {
 
 describe('expandHome', () => {
   it('expands leading ~/ against the home directory', async () => {
-    const { expandHome, resolveConfig } = await import('../dist/config.js')
+    const { expandHome } = await import('../dist/config.js')
     assert.match(expandHome('~/.pi/x'), /\.pi\/x$/)
     assert.ok(!expandHome('~/.pi/x').startsWith('~'))
     assert.equal(expandHome('/abs/path'), '/abs/path')

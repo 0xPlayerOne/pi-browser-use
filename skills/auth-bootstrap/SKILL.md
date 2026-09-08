@@ -1,58 +1,61 @@
 ---
 name: auth-bootstrap
-description: "Log the persistent browser profile in for the first time. Use when the persistent profile hits a login wall, after switching to a fresh machine, or when SSO, 2FA, or passkeys need a human."
+description: "Initialize or reauthenticate the managed persistent browser profile. Use on a new machine or plugin instance, at a login wall, or when SSO, 2FA, passkeys or provider verification require a human. Works with native Pi and portable MCP hosts."
 ---
 
 # Auth Bootstrap
 
-The persistent profile starts empty. Log in once per site; cookies persist across sessions after that. The agent must never see your passwords — you type, it waits.
+Each managed profile starts empty. Native Pi and portable clients have separate
+profiles by default. Call `browser_status` to identify this instance before doing
+anything: a signed-in daily Chrome or another agent client proves nothing about it.
+Never read, capture or paste passwords, one-time codes or session cookies into chat.
 
-## Recommended flow: headed once
+## First run: plain headed setup
 
-```text
-browser_switch_mode({ "mode": "persistent", "headed": true })
-```
+Select persistent mode when needed, then call `browser_setup`. Explain **before**
+calling it that an ordinary headed window opens on the managed profile, the human
+signs into the needed sites, and they close that window when finished. No browser
+automation is attached to this setup window. Do not automate its credential fields.
 
-1. A visible Chrome window opens on the persistent profile.
-2. **You** navigate and log in normally — including SSO, 2FA, and passkeys.
-3. Tell the agent you're done. It verifies (account page loads logged-in) and you close the window or it switches back to fresh.
+Setup waits for the window to close. Use a host tool timeout sufficient for a human
+login; cancellation or browser failure is not success. Successful setup initializes
+the profile, but does not prove that every target site is authenticated.
 
-Headless cannot do this step: 2FA apps, security keys, and most SSO device checks need a human and often a visible window.
+## Expired login or rejected instrumented sign-in
 
-## Power option: clone your daily profile
-
-Close **all** Chrome windows first (running Chrome locks the profile), then:
-
-```bash
-cp -R ~/Library/Application\ Support/Google/Chrome/Default ~/.pi/browser-profile
-```
-
-Same macOS user, so Keychain-bound cookies and passwords decrypt fine. Prefer the headed-once flow unless you have dozens of logins — clones carry sync state, extensions, and version skew that cause strange breakage. Never copy while Chrome runs; you'll corrupt both ends.
-
-## Google SSO says "browser or app may not be secure"
-
-Expected: Google rejects sign-in from automation-driven Chrome
-(`--enable-automation`, debugging pipe, fresh profile with no history).
-Don't fight it — use one of these instead:
-
-1. **Email + password** on the login form (no Google involved).
-2. **Your daily browser**, which Google already trusts (real history, no
-   automation flags). Point the session at it temporarily with
-   `mode: existing` and drive the flow there, then switch back.
-3. Complete SSO there once; the persistent profile keeps the resulting
-   Cloudflare session cookies either way.
-
-## What not to do
-
-- **Paste passwords or TOTP codes into chat.** The agent never needs them — type directly in the headed window.
-- **Export/import individual cookies** for HttpOnly session cookies. The tooling (keychain decryption, cookie-store surgery) is fragile; a two-minute headed login beats an hour of debugging.
-- **Reuse the persistent profile for hostile links.** Unknown URLs go through `fresh` — no credentials present, nothing to steal.
-
-## Verify
+In persistent mode, request the human handoff:
 
 ```text
-browser_navigate_page({ "pageId": <id>, "url": "https://github.com/settings/profile" })
-browser_take_snapshot({ "pageId": <id> })
+browser_reauth({ "url": "https://example.com/" })
 ```
 
-Your username on the page means the profile is live. If a site challenges headless later (bot checks sometimes do), redo that site with `headed: true` — same profile, same cookies.
+When the provider rejects an instrumented browser, use the plain variant on the
+**same managed identity**, not the user's daily profile:
+
+```text
+browser_reauth({ "url": "https://example.com/", "variant": "plain" })
+```
+
+Only the human completes SSO, 2FA, CAPTCHA, passkeys and device checks. Stop at the
+challenge; never loop attempts. A live peer-owned backend cannot be restarted or
+reauthenticated by this session: coordinate with its owner instead.
+
+## Resume and verify
+
+After human verification, return persistent automation to headless:
+
+```text
+browser_switch_mode({ "mode": "persistent" })
+browser_list_pages({})
+```
+
+Navigate an explicitly identified page to a benign, task-relevant account page and
+verify its authenticated DOM. For Gmail, load `gmail-auth`; generic Chrome sign-in
+is not proof of Gmail authentication. If only headless execution fails on this
+profile, use persistent headed-background with `rememberSite: true` for that origin,
+not a global downgrade.
+
+Never clone daily Chrome profiles, export/import cookies, or point `userDataDir` at
+the user's daily browser directory. Existing mode is a separate identity and requires
+the user's explicit choice. Its cookies do not migrate back to persistent mode.
+Use fresh mode only for anonymous checks and clean-room reproductions.

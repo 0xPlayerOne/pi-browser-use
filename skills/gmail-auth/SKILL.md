@@ -1,6 +1,6 @@
 ---
 name: gmail-auth
-description: "Verify Gmail authentication in the persistent Pi browser profile. Use when a task needs the Gmail inbox, after browser_setup, or when Google shows a login or verification challenge."
+description: "Verify Gmail authentication in the persistent managed browser profile. Use when a task needs the Gmail inbox, after browser_setup, or when Google shows a login or verification challenge."
 ---
 
 # Gmail Auth
@@ -10,11 +10,14 @@ Authentication state lives in this skill, not in a generic browser heuristic: on
 ## Verify first
 
 ```text
-browser_open_background_tab({ "url": "https://mail.google.com/" })
+browser_new_page({ "url": "https://mail.google.com/", "background": true })
 browser_take_snapshot({ "pageId": <id> })
 ```
 
-Or in persistent mode, navigate directly — the persistent profile is Pi's browser, no tab group needed.
+Use the page ID returned by `browser_list_pages`. In explicitly selected Existing
+mode, use `browser_open_background_tab` instead so the bundled Chrome extension
+creates a grouped inactive tab. Check `browser_status` for the active profile; a
+login in another client or daily Chrome does not authenticate this instance.
 
 ## Authenticated
 

@@ -113,7 +113,9 @@ export function parseMcpPageList(result: unknown): McpPageEntry[] {
       const entry: McpPageEntry = { pageId: Number(match[1]) }
       const title = (match[2] ?? '').trim()
       if (title) entry.title = title
-      const url = (match[3] ?? '').trim()
+      // chrome-devtools-mcp 1.8 emits `N: URL [selected]`; retain support
+      // for the older `N: title (URL)` form as well.
+      const url = (match[3] ?? (/^(https?:|about:|file:|data:)/.test(title) ? title : '')).trim()
       if (url) entry.url = url
       entries.push(entry)
     }
@@ -153,7 +155,8 @@ export async function openExistingPage(
   } catch (error) {
     throw new Error(
       `Pi extension did not open the tab (token ${token}). ` +
-        `Is the extension installed and polling the tab bridge? (${error instanceof Error ? error.message : String(error)})`
+        `Is the extension installed and polling the tab bridge? (${error instanceof Error ? error.message : String(error)})`,
+      { cause: error }
     )
   }
   let pageId: number | undefined

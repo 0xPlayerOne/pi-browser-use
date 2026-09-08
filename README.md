@@ -1,5 +1,8 @@
 # pi-browser-use
 
+Native Pi extension **and Agent Plugins 1.0 / standalone MCP server**, sharing the same
+curated browser runtime. See [portable installation and configuration](docs/agent-plugins.md).
+
 Opinionated browser-use for the [Pi coding agent](https://pi.dev), powered by [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp) — not Playwright.
 
 ## Why this exists
