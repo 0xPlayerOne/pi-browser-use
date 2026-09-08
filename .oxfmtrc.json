@@ -11,5 +11,13 @@
     "node_modules/",
     "dist/",
     "coverage/"
+  ],
+  "overrides": [
+    {
+      "files": ["plugin.json"],
+      "options": {
+        "printWidth": 60
+      }
+    }
   ]
 }
