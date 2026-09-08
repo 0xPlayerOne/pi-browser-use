@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.10.0...pi-browser-use-v0.10.1) (2026-09-08)
+
+
+### Maintenance
+
+* **ci:** upgrade Code Foundry workflows to v1.9.12 ([#42](https://github.com/0xPlayerOne/pi-browser-use/issues/42)) ([531f291](https://github.com/0xPlayerOne/pi-browser-use/commit/531f2910909133cea2b365c80305447247b1ac63))
+
 ## [0.10.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.9.6...pi-browser-use-v0.10.0) (2026-09-08)
 
 
