@@ -104,6 +104,8 @@ export class DevToolsClient {
     })
     const client = new Client({ name: 'pi-browser-use', version: '0.1.0' }, { capabilities: {} })
     this.client = client
+    // MCP transport implements callback properties, not EventTarget.
+    // oxlint-disable-next-line unicorn/prefer-add-event-listener
     transport.onerror = (error: Error & { code?: unknown }) => {
       if (generation !== this.generation) return
       transportErrorCode = safeSystemErrorCode(error.code)
@@ -112,11 +114,12 @@ export class DevToolsClient {
       )
       void this.disconnectUnhealthyClient(generation)
     }
+    // oxlint-disable-next-line unicorn/prefer-add-event-listener
     transport.onclose = () => this.markDisconnected(generation)
     try {
       await client.connect(
         transport,
-        signal ? { signal, timeout: MCP_TIMEOUT_MS } : { timeout: MCP_TIMEOUT_MS }
+        signal ? { signal, timeout: MCP_TIMEOUT_MS } : { timeout: MCP_TIMEOUT_MS, signal }
       )
       if (generation !== this.generation) return
       this.state = 'ready'
@@ -141,6 +144,8 @@ export class DevToolsClient {
           : undefined
       const diagnostic = summarizeFailure(stderr, errorName, transportErrorCode ?? errorCode)
       console.error(`[pi-browser-use] browser connection failed: ${diagnostic}`)
+      // Raw upstream causes can contain credentials; retain only the sanitized diagnostic.
+      // oxlint-disable-next-line preserve-caught-error
       throw new Error(`Browser connection failed. ${diagnostic}`)
     }
   }
@@ -193,6 +198,7 @@ export class DevToolsClient {
     do {
       const result = await client.listTools(cursor ? { cursor } : undefined, {
         timeout: MCP_TIMEOUT_MS,
+        signal,
       })
       allTools.push(
         ...result.tools.map((t) => ({
@@ -214,21 +220,24 @@ export class DevToolsClient {
       return await client.callTool(
         { name, arguments: args as Record<string, unknown> },
         undefined,
-        { timeout: MCP_TIMEOUT_MS }
+        { timeout: MCP_TIMEOUT_MS, signal }
       )
     } catch (error) {
       if (signal?.aborted) throw error
       if (this.state !== 'ready' || this.client !== client) {
+        // oxlint-disable-next-line preserve-caught-error -- upstream causes may contain secrets
         throw new Error('Browser connection lost; retry the tool.')
       }
       const errorName = error instanceof Error ? error.name : 'UnknownError'
       console.error(`[pi-browser-use] upstream tool call failed (${errorName})`)
       // Existing mode fails most often on the consent gate: say so plainly.
       if (this.config.sessionMode === 'existing') {
+        // oxlint-disable-next-line preserve-caught-error -- upstream causes may contain secrets
         throw new Error(
           'Browser tool call failed. If Chrome is showing an "Allow remote debugging?" prompt, click Allow and retry.'
         )
       }
+      // oxlint-disable-next-line preserve-caught-error -- upstream causes may contain secrets
       throw new Error('Browser tool call failed.')
     }
   }

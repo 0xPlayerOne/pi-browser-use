@@ -122,7 +122,8 @@ export function acquireProfileLock(
   const holderPid = readLockPid(lockPath)
   const ageMs = readLockAgeMs(lockPath)
   const holderAlive = holderPid !== undefined && isPidAlive(holderPid)
-  const isStale = !holderAlive || (ageMs !== undefined && ageMs > staleMs)
+  const isStale =
+    !holderAlive && (holderPid !== undefined || (ageMs !== undefined && ageMs > staleMs))
 
   if (isStale) {
     try {

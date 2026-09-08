@@ -99,11 +99,13 @@ export type BrowserMode = 'fresh' | 'persistent' | 'existing'
 export function resolveModeTarget(
   base: BrowserUseConfig,
   mode: BrowserMode,
-  headed = false
+  headed = false,
+  defaultProfileDir = DEFAULT_PROFILE_DIR
 ): BrowserUseConfig {
   const {
     browserUrl: _browserUrl,
     wsEndpoint: _wsEndpoint,
+    wsHeaders: _wsHeaders,
     autoConnect: _autoConnect,
     mode: _mode,
     headed: _headed,
@@ -111,6 +113,7 @@ export function resolveModeTarget(
   } = base
   void _browserUrl
   void _wsEndpoint
+  void _wsHeaders
   void _autoConnect
   void _mode
   void _headed
@@ -120,11 +123,21 @@ export function resolveModeTarget(
     return { ...freshRest, sessionMode: 'isolated', headless: !headed, isolated: true }
   }
   if (mode === 'existing') {
-    // Attach to the user's running Chrome: drop Pi-owned launch fields so
-    // MCP auto-connects instead of starting its own browser.
-    const { userDataDir: _userDataDir, isolated: _isolated, ...existingRest } = rest
+    // Attach to the user's running Chrome: drop launch-only fields so MCP
+    // auto-connects instead of trying to start or reconfigure its browser.
+    const {
+      userDataDir: _userDataDir,
+      isolated: _isolated,
+      executablePath: _executablePath,
+      chromeArgs: _chromeArgs,
+      viewport: _viewport,
+      ...existingRest
+    } = rest
     void _userDataDir
     void _isolated
+    void _executablePath
+    void _chromeArgs
+    void _viewport
     // Existing attaches to the user's visible Chrome: always headed.
     return { ...existingRest, sessionMode: 'existing', headless: false, autoConnect: true }
   }
@@ -133,7 +146,7 @@ export function resolveModeTarget(
     sessionMode: 'persistent',
     headless: !headed,
     isolated: false,
-    userDataDir: base.userDataDir ?? DEFAULT_PROFILE_DIR,
+    userDataDir: base.userDataDir ?? defaultProfileDir,
   }
 }
 
@@ -143,7 +156,10 @@ export function expandHome(path: string): string {
 }
 
 /** Merge user config over fresh-headless defaults. */
-export function resolveConfig(config?: BrowserUseConfig): BrowserUseConfig {
+export function resolveConfig(
+  config?: BrowserUseConfig,
+  defaultProfileDir = DEFAULT_PROFILE_DIR
+): BrowserUseConfig {
   const { mode, headed, ...rest } = config ?? {}
   const resolved: BrowserUseConfig = { ...DEFAULTS, ...rest }
   if (typeof resolved.userDataDir === 'string')
@@ -191,7 +207,7 @@ export function resolveConfig(config?: BrowserUseConfig): BrowserUseConfig {
       break
     default:
       if (!resolved.userDataDir && !resolved.browserUrl && !resolved.wsEndpoint) {
-        resolved.userDataDir = DEFAULT_PROFILE_DIR
+        resolved.userDataDir = defaultProfileDir
       }
       break
   }

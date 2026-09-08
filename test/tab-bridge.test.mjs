@@ -119,6 +119,22 @@ describe('TabBridge', () => {
     }
   })
 
+  it('removes cancelled requests before the extension can consume them', async () => {
+    const bridge = await startedBridge()
+    try {
+      const token = bridge.requestTab('https://example.com/')
+      const controller = new AbortController()
+      controller.abort()
+      await assert.rejects(
+        () => bridge.waitForTab(token, { timeoutMs: 2_000, signal: controller.signal }),
+        /aborted/
+      )
+      assert.equal(bridge.pendingCount(), 0)
+    } finally {
+      await bridge.stop()
+    }
+  })
+
   it('expires stale requests so dead extensions leak nothing', async () => {
     const bridge = await startedBridge({ requestTtlMs: 50 })
     try {

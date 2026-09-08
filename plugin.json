@@ -1,0 +1,12 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "pi-browser-use",
+  "version": "0.9.6",
+  "description": "Managed persistent, fresh, and existing Chrome sessions with focus-safe browser tools and CLI-first skills.",
+  "author": {
+    "name": "0xPlayerOne"
+  },
+  "repository": "https://github.com/0xPlayerOne/pi-browser-use",
+  "license": "MIT",
+  "keywords": ["browser", "chrome", "mcp", "agent-skills", "pi"]
+}

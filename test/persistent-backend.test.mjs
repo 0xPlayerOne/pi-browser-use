@@ -23,6 +23,12 @@ function makeLock() {
   return { profileDir: '/x', lockPath: '/x.lock', released: false, release() {} }
 }
 
+function sweep(profile) {
+  rmSync(profile, { recursive: true, force: true })
+  rmSync(`${profile}.backend.json`, { force: true })
+  rmSync(`${profile}.pages.json`, { force: true })
+}
+
 describe('PersistentBackend', () => {
   let dir
   beforeEach(() => {
@@ -151,12 +157,6 @@ describe('PersistentBackend', () => {
 })
 
 describe('shared attach', () => {
-  function sweep(profile) {
-    rmSync(profile, { recursive: true, force: true })
-    rmSync(`${profile}.backend.json`, { force: true })
-    rmSync(`${profile}.pages.json`, { force: true })
-  }
-
   it('attaches to a live peer advert instead of failing on the lock', async () => {
     const profile = mkdtempSync(join(tmpdir(), 'pi-shared-attach-'))
     try {
@@ -233,4 +233,35 @@ describe('shouldSelfLaunch', () => {
       else process.env.PI_BROWSER_USE_LEGACY_PERSISTENT = prior
     }
   })
+})
+
+it('attach configuration separates launch-only flags and propagates startup cancellation', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'browser-attach-options-'))
+  t.after(() => sweep(dir))
+  const controller = new AbortController()
+  let launched
+  const backend = new PersistentBackend({
+    config: {
+      userDataDir: dir,
+      executablePath: '/fixture/chrome',
+      channel: 'stable',
+      chromeArgs: ['--disable-gpu'],
+    },
+    lock: makeLock,
+    launch: async (options) => {
+      launched = options
+      return makeChrome()
+    },
+  })
+  t.after(() => backend.stop())
+  const config = await backend.start(controller.signal)
+  assert.equal(launched.signal, controller.signal)
+  assert.equal(launched.executablePath, '/fixture/chrome')
+  assert.deepEqual(launched.chromeArgs, ['--disable-gpu'])
+  assert.equal(config.browserUrl, 'http://127.0.0.1:54321')
+  for (const key of ['userDataDir', 'executablePath', 'channel', 'chromeArgs'])
+    assert.equal(config[key], undefined)
+  assert.equal(shouldSelfLaunch({ browserUrl: 'http://127.0.0.1:54321' }), false)
+  assert.equal(shouldSelfLaunch({ wsEndpoint: 'ws://127.0.0.1:54321' }), false)
+  assert.equal(shouldSelfLaunch({ autoConnect: true }), false)
 })

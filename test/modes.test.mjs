@@ -67,7 +67,14 @@ describe('resolveModeTarget', () => {
 
   it('existing attaches to the user Chrome: autoConnect, headed, no owned profile', () => {
     const next = resolveModeTarget(
-      { sessionMode: 'persistent', userDataDir: '/tmp/mine', isolated: false },
+      {
+        sessionMode: 'persistent',
+        userDataDir: '/tmp/mine',
+        isolated: false,
+        executablePath: '/tmp/chrome',
+        chromeArgs: ['--disable-gpu'],
+        viewport: '1280x720',
+      },
       'existing'
     )
     assert.equal(next.sessionMode, 'existing')
@@ -75,6 +82,9 @@ describe('resolveModeTarget', () => {
     assert.equal(next.headless, false)
     assert.equal(next.userDataDir, undefined)
     assert.equal(next.isolated, undefined)
+    assert.equal(next.executablePath, undefined)
+    assert.equal(next.chromeArgs, undefined)
+    assert.equal(next.viewport, undefined)
     assert.equal(next.browserUrl, undefined)
   })
 })

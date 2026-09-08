@@ -190,6 +190,7 @@ export class PersistentBackend {
         headless: !headed,
         chromeArgs: this.options.config.chromeArgs,
         executablePath: this.options.config.executablePath,
+        signal,
       })
     } catch (error) {
       this.lock.release()
@@ -226,9 +227,21 @@ export class PersistentBackend {
    */
   attachConfig(): BrowserUseConfig {
     const browserUrl = this.effectiveBrowserUrl()
-    const { userDataDir: _userDataDir, isolated: _isolated, ...rest } = this.options.config
+    const {
+      userDataDir: _userDataDir,
+      isolated: _isolated,
+      executablePath: _executablePath,
+      channel: _channel,
+      chromeArgs: _chromeArgs,
+      ...rest
+    } = this.options.config
     void _userDataDir
     void _isolated
+    void _executablePath
+    void _channel
+    void _chromeArgs
+    // We already launched Chrome with these options. Upstream rejects an
+    // executable/channel combined with browserUrl; attach must not relaunch.
     return { ...rest, browserUrl, isolated: false }
   }
 
@@ -286,7 +299,7 @@ export class PersistentBackend {
   }
 
   /** Restart into the other visibility (headless <-> headed fallback). */
-  async restart(headed: boolean): Promise<BrowserUseConfig> {
+  async restart(headed: boolean, signal?: AbortSignal): Promise<BrowserUseConfig> {
     if (this.sharedAdvert) {
       throw new Error(
         'Cannot restart a shared peer backend (owned by another live session). ' +
@@ -295,7 +308,7 @@ export class PersistentBackend {
     }
     await this.stop()
     this.options.headed = headed
-    return this.start()
+    return this.start(signal)
   }
 }
 
@@ -305,6 +318,5 @@ export class PersistentBackend {
  */
 export function shouldSelfLaunch(config: BrowserUseConfig): boolean {
   if (process.env['PI_BROWSER_USE_LEGACY_PERSISTENT'] === '1') return false
-  void config
-  return true
+  return !config.browserUrl && !config.wsEndpoint && !config.autoConnect
 }
