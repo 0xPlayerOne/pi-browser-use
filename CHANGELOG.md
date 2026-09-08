@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.6](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.9.5...pi-browser-use-v0.9.6) (2026-09-08)
+
+
+### Maintenance
+
+* **ci:** upgrade Code Foundry to v1.9.11 ([#37](https://github.com/0xPlayerOne/pi-browser-use/issues/37)) ([a22ad2a](https://github.com/0xPlayerOne/pi-browser-use/commit/a22ad2ad43edcea2c9393bb1bcf110f3e768d9eb))
+
 ## [0.9.5](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.9.4...pi-browser-use-v0.9.5) (2026-09-08)
 
 
