@@ -100,10 +100,10 @@ async function probe(stage, termination) {
   mkdirSync(data, { recursive: true })
   mkdirSync(home, { recursive: true })
   if (withBrowser && termination === 'eof') {
-    const chromeArgs =
-      process.env.BROWSER_SMOKE_NO_SANDBOX === '1'
-        ? ['--no-sandbox', '--disable-dev-shm-usage']
-        : []
+    const chromeArgs = ['--use-mock-keychain']
+    if (process.env.BROWSER_SMOKE_NO_SANDBOX === '1') {
+      chromeArgs.push('--no-sandbox', '--disable-dev-shm-usage')
+    }
     writeFileSync(
       join(data, 'config.json'),
       JSON.stringify({ executablePath: findChromeExecutable(), chromeArgs })
