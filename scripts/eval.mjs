@@ -69,6 +69,34 @@ const ARTIFACT_FIXTURE = `<!doctype html>
   <body><h1>Artifact evidence</h1><p>This page is intentionally deterministic.</p></body>
 </html>`
 
+const NAV_FIXTURE = `<!doctype html>
+<html>
+  <head><title>Navigation target</title></head>
+  <body><main><h1>Navigation target</h1><a href="#next">Navigation link</a><button type="button">Navigation button</button></main></body>
+</html>`
+
+const CONSOLE_FIXTURE = `<!doctype html>
+<html>
+  <head><title>Console fixture</title></head>
+  <body>
+    <script>
+      console.error('eval-console-error');
+      console.warn('eval-console-warn');
+    </script>
+    <p>Console triage fixture</p>
+  </body>
+</html>`
+
+const SECOND_PAGE_FIXTURE = `<!doctype html>
+<html>
+  <head><title>Second page fixture</title></head>
+  <body><p>Opened by the multi-page task.</p></body>
+</html>`
+
+function dataUrl(html) {
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`
+}
+
 export const TASK_CATALOG = [
   {
     id: 'form-submit',
@@ -81,6 +109,22 @@ export const TASK_CATALOG = [
   {
     id: 'artifact-capture',
     description: 'Capture screenshot and rendered HTML artifacts for a deterministic page.',
+  },
+  {
+    id: 'navigate',
+    description: 'Navigate to a data URL and verify the snapshot and document state.',
+  },
+  {
+    id: 'console-triage',
+    description: 'Capture console errors and warnings from a deterministic page.',
+  },
+  {
+    id: 'annotate',
+    description: 'Save an annotated screenshot with an interactive-element coordinate map.',
+  },
+  {
+    id: 'multi-page',
+    description: 'Open, select, and close a second page with stable page IDs.',
   },
 ]
 
@@ -244,6 +288,14 @@ async function preparePage(context, html) {
   return { pageId, snapshot: resultText(snapshot) }
 }
 
+async function navigateToFixture(context, html) {
+  const pages = await context.call('list_pages')
+  const pageId = pageIdFromList(pages)
+  context.setPageId(pageId)
+  await context.call('navigate_page', { pageId, type: 'url', url: dataUrl(html) })
+  return pageId
+}
+
 async function runFormSubmit(context) {
   const { pageId, snapshot } = await preparePage(context, FORM_FIXTURE)
   const nameUid = findSnapshotUid(snapshot, 'textbox', 'Name')
@@ -325,10 +377,112 @@ async function runArtifactCapture(context, attemptDir) {
   }
 }
 
+async function runNavigate(context) {
+  const pageId = await navigateToFixture(context, NAV_FIXTURE)
+  const snapshot = resultText(await context.call('take_snapshot', { pageId }))
+  requireCondition(
+    snapshot.includes('Navigation target'),
+    'Navigated page content missing from the accessibility snapshot.'
+  )
+  const title = resultText(
+    await context.call('evaluate_script', { pageId, function: '() => document.title' })
+  )
+  requireCondition(
+    title.includes('Navigation target'),
+    `Unexpected document title after navigation: ${title}`
+  )
+  return {
+    checks: [
+      'navigate_page loaded the fixture URL',
+      'snapshot reflected the new document',
+      'document title matched',
+    ],
+    metrics: {},
+  }
+}
+
+async function runConsoleTriage(context) {
+  const pageId = await navigateToFixture(context, CONSOLE_FIXTURE)
+  const errors = resultText(
+    await context.call('list_console_messages', { pageId, types: ['error'] })
+  )
+  requireCondition(errors.includes('eval-console-error'), 'Console error was not captured.')
+  const all = resultText(await context.call('list_console_messages', { pageId }))
+  requireCondition(all.includes('eval-console-warn'), 'Console warning was not captured.')
+  return {
+    checks: ['console error captured with a type filter', 'console warning captured'],
+    metrics: {},
+  }
+}
+
+async function runAnnotate(context, attemptDir) {
+  const { pageId } = await preparePage(context, NAV_FIXTURE)
+  const path = join(attemptDir, 'deliverables', 'annotated.png')
+  const annotated = await context.call('save_artifact', {
+    pageId,
+    kind: 'screenshot',
+    annotate: true,
+    path,
+  })
+  const text = resultText(annotated)
+  requireCondition(
+    text.includes('Annotated elements:'),
+    'Annotated element map missing from the save_artifact result.'
+  )
+  requireCondition(/button/i.test(text), 'Annotated map did not list a button element.')
+  requireCondition(existsSync(path) && statSync(path).size > 0, 'Annotated screenshot was empty.')
+  context.addArtifact({ kind: 'screenshot-annotated', path, sizeBytes: statSync(path).size })
+  return {
+    checks: ['annotated screenshot saved', 'coordinate map returned for interactive elements'],
+    metrics: {},
+  }
+}
+
+async function runMultiPage(context) {
+  const baseline = parseMcpPageList(await context.call('list_pages'))
+  const opened = parseMcpPageList(
+    await context.call('new_page', { url: dataUrl(SECOND_PAGE_FIXTURE) })
+  )
+  const created = opened.find((entry) => !baseline.some((page) => page.pageId === entry.pageId))
+  requireCondition(created, 'new_page did not add a page to the list.')
+  const afterOpen = parseMcpPageList(await context.call('list_pages'))
+  requireCondition(
+    afterOpen.length === baseline.length + 1,
+    `Page count after open was ${afterOpen.length}, expected ${baseline.length + 1}.`
+  )
+  await context.call('select_page', { pageId: created.pageId })
+  const title = resultText(
+    await context.call('evaluate_script', {
+      pageId: created.pageId,
+      function: '() => document.title',
+    })
+  )
+  requireCondition(title.includes('Second page fixture'), `Second page title mismatch: ${title}`)
+  await context.call('close_page', { pageId: created.pageId })
+  const afterClose = parseMcpPageList(await context.call('list_pages'))
+  requireCondition(
+    afterClose.length === baseline.length,
+    `Page count after close was ${afterClose.length}, expected ${baseline.length}.`
+  )
+  return {
+    checks: [
+      'new_page opened a second page',
+      'page list reflected the open/close cycle',
+      'select_page focused the new page',
+      'second page content evaluated',
+    ],
+    metrics: {},
+  }
+}
+
 const TASKS = [
   taskResult('form-submit', runFormSubmit),
   taskResult('extract-list', runExtractList),
   taskResult('artifact-capture', runArtifactCapture),
+  taskResult('navigate', runNavigate),
+  taskResult('console-triage', runConsoleTriage),
+  taskResult('annotate', runAnnotate),
+  taskResult('multi-page', runMultiPage),
 ]
 const TASKS_BY_ID = new Map(TASKS.map((task) => [task.id, task]))
 
@@ -462,14 +616,19 @@ export function deadlineSignal(timeoutMs) {
   return { signal: controller.signal, clear: () => clearTimeout(timer) }
 }
 
-async function runAttempt(task, iteration, options) {
-  const attemptDir = join(options.outputDir, task.id, `iteration-${iteration}`)
-  mkdirSync(attemptDir, { recursive: true })
-  const runtime = createBrowserRuntime({
+function defaultCreateRuntime(attemptDir) {
+  return createBrowserRuntime({
     config: { mode: 'fresh', headed: false },
     defaultProfileDir: join(attemptDir, 'profile'),
     artifactDir: join(attemptDir, 'artifacts'),
   })
+}
+
+/** Run one task attempt. `deps.createRuntime` is injectable for tests. */
+export async function runAttempt(task, iteration, options, deps = {}) {
+  const attemptDir = join(options.outputDir, task.id, `iteration-${iteration}`)
+  mkdirSync(attemptDir, { recursive: true })
+  const runtime = (deps.createRuntime ?? defaultCreateRuntime)(attemptDir)
   const deadline = deadlineSignal(options.timeoutMs)
   const attemptStarted = performance.now()
   let startupMs
@@ -550,14 +709,14 @@ export function summarizeEvaluation(taskResults) {
   }
 }
 
-export async function runEvaluation(options) {
+export async function runEvaluation(options, deps = {}) {
   mkdirSync(options.outputDir, { recursive: true })
   const taskResults = []
   for (const taskId of options.taskIds) {
     const task = TASKS_BY_ID.get(taskId)
     const attempts = []
     for (let iteration = 1; iteration <= options.iterations; iteration += 1) {
-      attempts.push(await runAttempt(task, iteration, options))
+      attempts.push(await runAttempt(task, iteration, options, deps))
     }
     taskResults.push({
       id: task.id,

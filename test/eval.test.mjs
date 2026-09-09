@@ -1,11 +1,15 @@
 import { it } from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   clipText,
   deadlineSignal,
   findSnapshotUid,
   parseEvalArgs,
   parseEvaluatedJson,
+  runAttempt,
   stats,
   summarizeEvaluation,
   TASK_CATALOG,
@@ -135,5 +139,119 @@ it('summarizes task outcomes and step timings', () => {
   assert.equal(summary.taskDurationMs.p95, 30)
   assert.equal(summary.startupMs.mean, 4.5)
   assert.equal(summary.stepDurationMs.max, 7)
-  assert.equal(TASK_CATALOG.length >= 3, true)
+  assert.deepEqual(TASK_CATALOG.map((task) => task.id).toSorted(), [
+    'annotate',
+    'artifact-capture',
+    'console-triage',
+    'extract-list',
+    'form-submit',
+    'multi-page',
+    'navigate',
+  ])
+})
+
+const fakeOptions = (work) => ({
+  outputDir: work,
+  evidence: 'none',
+  timeoutMs: 45_000,
+})
+
+function fakeRuntimeTools(handlers) {
+  return Object.entries(handlers).map(([name, execute]) => ({
+    name: `browser_${name}`,
+    execute,
+  }))
+}
+
+it('classifies a startup failure as a harness failure', async () => {
+  const work = mkdtempSync(join(tmpdir(), 'eval-attempt-'))
+  try {
+    const attempt = await runAttempt(
+      { id: 'fixture', description: '', run: async () => ({}) },
+      1,
+      fakeOptions(work),
+      {
+        createRuntime: () => ({
+          start: async () => {
+            throw new Error('Chrome executable was not found.')
+          },
+          stop: async () => {},
+        }),
+      }
+    )
+    assert.equal(attempt.status, 'failed')
+    assert.equal(attempt.failureClass, 'harness')
+    assert.equal(attempt.startupMs, undefined)
+    assert.deepEqual(attempt.steps, [])
+    assert.equal(attempt.cleanup.status, 'passed')
+  } finally {
+    rmSync(work, { recursive: true, force: true })
+  }
+})
+
+it('classifies a first-tool failure as harness and a post-progress failure as task', async () => {
+  const work = mkdtempSync(join(tmpdir(), 'eval-attempt-'))
+  try {
+    const brokenTool = fakeRuntimeTools({
+      list_pages: async () => ({ content: [], isError: true }),
+    })
+    const broken = await runAttempt(
+      { id: 'fixture', description: '', run: async (context) => context.call('list_pages') },
+      1,
+      fakeOptions(work),
+      { createRuntime: () => ({ start: async () => brokenTool, stop: async () => {} }) }
+    )
+    assert.equal(broken.status, 'failed')
+    assert.equal(broken.failureClass, 'harness')
+
+    const workingTool = fakeRuntimeTools({
+      list_pages: async () => ({
+        content: [{ type: 'text', text: '1: about:blank [selected]' }],
+      }),
+    })
+    const regressed = await runAttempt(
+      {
+        id: 'fixture',
+        description: '',
+        run: async (context) => {
+          await context.call('list_pages')
+          throw new Error('Fixture assertion failed.')
+        },
+      },
+      1,
+      fakeOptions(work),
+      { createRuntime: () => ({ start: async () => workingTool, stop: async () => {} }) }
+    )
+    assert.equal(regressed.status, 'failed')
+    assert.equal(regressed.failureClass, 'task')
+    assert.equal(regressed.steps.filter((step) => step.status === 'passed').length, 1)
+  } finally {
+    rmSync(work, { recursive: true, force: true })
+  }
+})
+
+it('reports a cleanup failure as a harness failure without masking a passed task', async () => {
+  const work = mkdtempSync(join(tmpdir(), 'eval-attempt-'))
+  try {
+    const attempt = await runAttempt(
+      { id: 'fixture', description: '', run: async () => ({ checks: ['ok'] }) },
+      1,
+      fakeOptions(work),
+      {
+        createRuntime: () => ({
+          start: async () => fakeRuntimeTools({ list_pages: async () => ({ content: [] }) }),
+          stop: async () => {
+            throw new Error('Chrome refused to exit.')
+          },
+        }),
+      }
+    )
+    assert.equal(attempt.status, 'failed')
+    assert.equal(attempt.failureClass, 'harness')
+    assert.equal(attempt.cleanup.status, 'failed')
+    assert.match(attempt.failure.message, /refused to exit/)
+    assert.deepEqual(attempt.checks, ['ok'])
+  } finally {
+    rmSync(work, { recursive: true, force: true })
+  }
 })
