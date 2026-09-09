@@ -12,6 +12,7 @@
  *   [--json] [--list]
  */
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -91,13 +92,15 @@ function roundMs(value) {
   return Math.round(value * 100) / 100
 }
 
-/** Clip judge-facing text while preserving both ends of the message. */
+/** Clip judge-facing text to exactly `limit` characters while preserving both ends. */
 export function clipText(value, limit = MAX_ERROR_LENGTH) {
   const text = String(value ?? '')
   if (text.length <= limit) return text
-  const head = Math.ceil(limit / 2)
-  const tail = Math.floor(limit / 2)
-  return `${text.slice(0, head)}…[${text.length - limit} chars omitted]…${text.slice(-tail)}`
+  const marker = `…[at least ${text.length - limit} chars omitted]…`
+  const budget = limit - marker.length
+  if (budget <= 0) return text.slice(0, limit)
+  const head = Math.floor(budget / 3)
+  return `${text.slice(0, head)}${marker}${text.slice(-(budget - head))}`
 }
 
 function percentile(samples, fraction) {
@@ -139,7 +142,24 @@ export function parseEvaluatedJson(result) {
   return JSON.parse((fenced?.[1] ?? text).trim())
 }
 
+const KNOWN_FLAGS = new Set([
+  '--task',
+  '--iterations',
+  '--timeout-ms',
+  '--evidence',
+  '--output',
+  '--json',
+  '--list',
+  '--help',
+  '-h',
+])
+
 export function parseEvalArgs(argv = process.argv.slice(2)) {
+  for (const arg of argv) {
+    if (arg.startsWith('--') && !KNOWN_FLAGS.has(arg)) {
+      throw new Error(`Unknown option "${arg}". Use --help to see options.`)
+    }
+  }
   const valueAfter = (name) => {
     const index = argv.indexOf(name)
     return index >= 0 ? argv[index + 1] : undefined
@@ -325,6 +345,7 @@ function createTaskContext(tools, signal, attemptDir, evidenceMode) {
   const artifacts = []
   let currentPageId
   let capturing = false
+  let evidenceErrors = 0
 
   function toolFor(name) {
     const tool = tools.find((candidate) => candidate.name === `browser_${name}`)
@@ -357,8 +378,11 @@ function createTaskContext(tools, signal, attemptDir, evidenceMode) {
       )
       if (!result?.isError && existsSync(path)) {
         artifacts.push({ kind: 'evidence', label, path, sizeBytes: statSync(path).size })
+      } else {
+        evidenceErrors += 1
       }
     } catch {
+      evidenceErrors += 1
       // Evidence is best effort and must not mask the task's real failure.
     } finally {
       capturing = false
@@ -390,7 +414,16 @@ function createTaskContext(tools, signal, attemptDir, evidenceMode) {
     }
   }
 
-  return { call, capture, setPageId, addArtifact, steps, artifacts, getPageId: () => currentPageId }
+  return {
+    call,
+    capture,
+    setPageId,
+    addArtifact,
+    steps,
+    artifacts,
+    evidenceErrors,
+    getPageId: () => currentPageId,
+  }
 }
 
 function errorInfo(error) {
@@ -410,7 +443,16 @@ function dependencyHash() {
   }
 }
 
-function deadlineSignal(timeoutMs) {
+function gitRevision() {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim()
+  } catch {
+    return undefined
+  }
+}
+
+/** Abort the current attempt when it exceeds its deadline. */
+export function deadlineSignal(timeoutMs) {
   const controller = new AbortController()
   const timer = setTimeout(
     () => controller.abort(new Error(`Task deadline exceeded (${timeoutMs} ms).`)),
@@ -434,6 +476,7 @@ async function runAttempt(task, iteration, options) {
   let context
   let taskOutput = {}
   let failure
+  let failureClass
   let cleanupFailure
   let status = 'failed'
   try {
@@ -444,7 +487,12 @@ async function runAttempt(task, iteration, options) {
     taskOutput = await task.run(context, attemptDir)
     status = 'passed'
   } catch (error) {
+    // A failure before the runtime started, before any step succeeded, or in
+    // teardown means the browser environment is broken, not that the task
+    // regressed.
     failure = errorInfo(error)
+    const passedSteps = (context?.steps ?? []).filter((step) => step.status === 'passed').length
+    failureClass = startupMs === undefined || passedSteps === 0 ? 'harness' : 'task'
     if (context && options.evidence !== 'none') {
       const captureSignal = AbortSignal.timeout(5_000)
       await context.capture('failure', captureSignal)
@@ -456,6 +504,7 @@ async function runAttempt(task, iteration, options) {
     } catch (error) {
       cleanupFailure = errorInfo(error)
       failure ??= cleanupFailure
+      failureClass = 'harness'
       status = 'failed'
     }
   }
@@ -466,10 +515,11 @@ async function runAttempt(task, iteration, options) {
     startupMs,
     steps: context?.steps ?? [],
     artifacts: context?.artifacts ?? [],
+    evidenceErrors: context?.evidenceErrors ?? 0,
     cleanup: cleanupFailure ? { status: 'failed', failure: cleanupFailure } : { status: 'passed' },
     checks: taskOutput.checks ?? [],
     metrics: taskOutput.metrics ?? {},
-    ...(failure ? { failure } : {}),
+    ...(failure ? { failure, failureClass } : {}),
   }
 }
 
@@ -486,8 +536,10 @@ export function summarizeEvaluation(taskResults) {
     attempts: attempts.length,
     passed,
     failed,
+    harnessFailures: attempts.filter((attempt) => attempt.failureClass === 'harness').length,
     successRate: attempts.length === 0 ? 0 : roundMs(passed / attempts.length),
     toolCalls,
+    evidenceErrors: attempts.reduce((total, attempt) => total + (attempt.evidenceErrors ?? 0), 0),
     taskDurationMs: stats(attempts.map((attempt) => attempt.durationMs)),
     startupMs: stats(
       attempts
@@ -518,7 +570,7 @@ export async function runEvaluation(options) {
     schemaVersion: 1,
     harness: 'pi-browser-use-task-eval',
     generatedAt: new Date().toISOString(),
-    revision: process.env.GIT_COMMIT ?? process.env.GITHUB_SHA ?? 'unknown',
+    revision: process.env.GIT_COMMIT ?? process.env.GITHUB_SHA ?? gitRevision() ?? 'unknown',
     dependencyHash: dependencyHash(),
     node: process.version,
     platform: `${process.platform}-${process.arch}`,
@@ -563,6 +615,14 @@ async function main() {
   console.log(`Results: ${report.resultPath}`)
   for (const task of report.tasks) {
     console.log(`- ${task.id}: ${task.summary.passed}/${task.summary.attempts} passed`)
+  }
+  if (report.summary.harnessFailures > 0) {
+    console.log(
+      `Warning: ${report.summary.harnessFailures} harness failure(s) — the browser environment itself failed (startup/cleanup), not the tasks.`
+    )
+  }
+  if (report.summary.evidenceErrors > 0) {
+    console.log(`Warning: ${report.summary.evidenceErrors} evidence capture(s) failed.`)
   }
   if (report.summary.failed > 0) process.exitCode = 1
 }
