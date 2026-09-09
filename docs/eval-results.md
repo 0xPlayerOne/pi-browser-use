@@ -16,8 +16,9 @@ tooling can pin to the shape it parses.
 | `node`           | `string` | Node version, e.g. `v22.12.0`.                                                                                                |
 | `platform`       | `string` | `process.platform-process.arch`.                                                                                              |
 | `config`         | `object` | Effective run settings: `mode`, `headed`, `fixture`, `evidence`, `timeoutMs`.                                                 |
-| `iterations`     | `number` | Attempts per task.                                                                                                            |
-| `tasks`          | `array`  | One entry per selected task (see Task).                                                                                       |
+| `iterations`     | `number` | Attempts per task.                                                          |
+| `budgets`        | `object` | `{ file, applied, failures }` — outcome of the `eval-budgets.json` gate (see below). |
+| `tasks`          | `array`  | One entry per selected task (see Task).                                     |
 | `summary`        | `object` | Aggregate over all attempts (see Summary).                                                                                    |
 | `resultPath`     | `string` | Absolute path of the file itself.                                                                                             |
 
@@ -88,3 +89,14 @@ eval-results/
 ```
 
 `eval-results/` is gitignored. Delete it freely; every run rewrites its own tree.
+
+## Budgets
+
+`eval-budgets.json` (committed) gates the measured numbers after every run —
+locally via `npm run eval` and later through `ci eval` when the Code Foundry
+tier ships. Keys mirror the Code Foundry eval contract (`docs/EVALS.md` there):
+`successRate`, `taskP95Ms`, `startupP95Ms`, `stepP95Ms`, `maxHarnessFailures`,
+`maxEvidenceErrors`, `maxToolCalls`. A gate failure fails the run (exit 1) and
+is recorded in the report's `budgets.failures`; unknown keys fail closed.
+Override the file with `--budget-file <path>` (resolved against the repository
+root).

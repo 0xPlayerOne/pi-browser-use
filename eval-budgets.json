@@ -1,0 +1,8 @@
+{
+  "successRate": 1.0,
+  "taskP95Ms": 30000,
+  "startupP95Ms": 3000,
+  "stepP95Ms": 1500,
+  "maxHarnessFailures": 0,
+  "maxEvidenceErrors": 0
+}

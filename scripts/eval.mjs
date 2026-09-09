@@ -24,6 +24,7 @@ const DEFAULT_ITERATIONS = 1
 const DEFAULT_TIMEOUT_MS = 45_000
 const DEFAULT_EVIDENCE = 'failures'
 const DEFAULT_OUTPUT_DIR = 'eval-results'
+const DEFAULT_BUDGET_FILE = 'eval-budgets.json'
 const MAX_ERROR_LENGTH = 1_000
 const MAX_STEP_ERROR_LENGTH = 500
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -136,6 +137,16 @@ function roundMs(value) {
   return Math.round(value * 100) / 100
 }
 
+/** @param {unknown} value */
+function finite(value) {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+/** @param {unknown} value */
+function nonNegativeInt(value) {
+  return Number.isSafeInteger(value) && value >= 0
+}
+
 /** Clip judge-facing text to exactly `limit` characters while preserving both ends. */
 export function clipText(value, limit = MAX_ERROR_LENGTH) {
   const text = String(value ?? '')
@@ -192,6 +203,7 @@ const KNOWN_FLAGS = new Set([
   '--timeout-ms',
   '--evidence',
   '--output',
+  '--budget-file',
   '--json',
   '--list',
   '--help',
@@ -235,12 +247,15 @@ export function parseEvalArgs(argv = process.argv.slice(2)) {
   }
   const output = valueAfter('--output') ?? DEFAULT_OUTPUT_DIR
   if (!output) throw new Error('--output must not be empty.')
+  const budgetFile = valueAfter('--budget-file') ?? DEFAULT_BUDGET_FILE
+  if (budgetFile === '') throw new Error('--budget-file must not be empty.')
   return {
     iterations,
     timeoutMs,
     evidence,
     taskIds: taskIds.length > 0 ? taskIds : TASK_CATALOG.map((task) => task.id),
     outputDir: resolve(output),
+    budgetFile,
     json: argv.includes('--json'),
     list: argv.includes('--list'),
     help: argv.includes('--help') || argv.includes('-h'),
@@ -709,6 +724,90 @@ export function summarizeEvaluation(taskResults) {
   }
 }
 
+/**
+ * Evaluate the configured budget thresholds against the summary. Keys mirror
+ * the Code Foundry eval contract (docs/EVALS.md) so the same eval-budgets.json
+ * is enforced locally here and by `ci eval` when the managed tier ships.
+ * Unknown keys fail closed so a typo can never silently disable a gate.
+ * @param {ReturnType<typeof summarizeEvaluation>} summary
+ * @param {Record<string, unknown>} budgets
+ * @returns {{passed: boolean, failures: string[]}}
+ */
+export function evaluateBudgets(summary, budgets) {
+  if (!summary || typeof summary !== 'object')
+    return { passed: false, failures: ['summary must be an object'] }
+  if (!budgets || typeof budgets !== 'object' || Array.isArray(budgets))
+    return { passed: false, failures: ['budgets must be a JSON object'] }
+  const failures = []
+  const known = new Set([
+    'successRate',
+    'taskP95Ms',
+    'startupP95Ms',
+    'stepP95Ms',
+    'maxHarnessFailures',
+    'maxEvidenceErrors',
+    'maxToolCalls',
+  ])
+  for (const key of Object.keys(budgets)) {
+    if (!known.has(key)) failures.push(`budgets.${key}: unknown budget key`)
+  }
+  if (failures.length > 0) return { passed: false, failures }
+  const rate = budgets.successRate
+  if (rate !== undefined) {
+    if (!finite(rate) || rate < 0 || rate > 1)
+      return { passed: false, failures: ['budgets.successRate: must be between 0 and 1'] }
+    if (finite(summary.successRate) && summary.successRate < rate)
+      failures.push(`successRate ${summary.successRate.toFixed(2)} is below budget ${rate}`)
+  }
+  /** @type {const} */
+  const p95Fields = [
+    ['taskP95Ms', 'taskDurationMs'],
+    ['startupP95Ms', 'startupMs'],
+    ['stepP95Ms', 'stepDurationMs'],
+  ]
+  for (const [budgetField, summaryField] of p95Fields) {
+    const budget = budgets[budgetField]
+    if (budget === undefined) continue
+    if (!finite(budget) || budget <= 0)
+      return { passed: false, failures: [`budgets.${budgetField}: must be a positive number`] }
+    const p95 = summary[summaryField]?.p95
+    if (!finite(p95) || summary[summaryField].count === 0) continue
+    if (p95 > budget) failures.push(`${summaryField}.p95 ${p95}ms is above budget ${budget}ms`)
+  }
+  /** @type {const} */
+  const maxFields = [
+    ['maxHarnessFailures', 'harnessFailures'],
+    ['maxEvidenceErrors', 'evidenceErrors'],
+    ['maxToolCalls', 'toolCalls'],
+  ]
+  for (const [budgetField, summaryField] of maxFields) {
+    const budget = budgets[budgetField]
+    if (budget === undefined) continue
+    if (!nonNegativeInt(budget))
+      return { passed: false, failures: [`budgets.${budgetField}: must be a non-negative integer`] }
+    if (nonNegativeInt(summary[summaryField]) && summary[summaryField] > budget)
+      failures.push(`${summaryField} ${summary[summaryField]} is above budget ${budget}`)
+  }
+  return { passed: failures.length === 0, failures }
+}
+
+/** Load the budget file; parse failures are reported as gate failures. */
+function loadBudgets(file = DEFAULT_BUDGET_FILE) {
+  const path = resolve(ROOT, file)
+  if (!existsSync(path)) return { file, applied: false, failures: [] }
+  try {
+    return { file, applied: true, budgets: JSON.parse(readFileSync(path, 'utf8')), failures: [] }
+  } catch (error) {
+    return {
+      file,
+      applied: true,
+      failures: [
+        `budget file is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      ],
+    }
+  }
+}
+
 export async function runEvaluation(options, deps = {}) {
   mkdirSync(options.outputDir, { recursive: true })
   const taskResults = []
@@ -744,14 +843,25 @@ export async function runEvaluation(options, deps = {}) {
     tasks: taskResults,
     summary: summarizeEvaluation(taskResults),
   }
+  const budgets = loadBudgets(options.budgetFile)
+  const budgetGate = budgets.budgets ? evaluateBudgets(report.summary, budgets.budgets) : null
+  const budgetOutcome = {
+    file: budgets.file,
+    applied: budgets.applied,
+    failures: budgetGate ? budgetGate.failures : budgets.failures,
+  }
   const resultPath = join(options.outputDir, 'result.json')
-  writeFileSync(resultPath, `${JSON.stringify({ ...report, resultPath }, null, 2)}\n`, 'utf8')
-  return { ...report, resultPath }
+  writeFileSync(
+    resultPath,
+    `${JSON.stringify({ ...report, budgets: budgetOutcome, resultPath }, null, 2)}\n`,
+    'utf8'
+  )
+  return { ...report, budgets: budgetOutcome, resultPath }
 }
 
 function printHelp() {
   console.log(
-    `Task-level browser evaluator\n\nOptions:\n  --task <id[,id]>       Run selected tasks (default: all)\n  --iterations <n>       Attempts per task (default: ${DEFAULT_ITERATIONS})\n  --timeout-ms <n>       Per-attempt deadline (default: ${DEFAULT_TIMEOUT_MS})\n  --evidence <mode>      none, failures, or all (default: ${DEFAULT_EVIDENCE})\n  --output <dir>         Result/artifact directory (default: ${DEFAULT_OUTPUT_DIR})\n  --json                 Print the complete report as JSON\n  --list                 List available tasks without launching Chrome\n`
+    `Task-level browser evaluator\n\nOptions:\n  --task <id[,id]>       Run selected tasks (default: all)\n  --iterations <n>       Attempts per task (default: ${DEFAULT_ITERATIONS})\n  --timeout-ms <n>       Per-attempt deadline (default: ${DEFAULT_TIMEOUT_MS})\n  --evidence <mode>      none, failures, or all (default: ${DEFAULT_EVIDENCE})\n  --output <dir>         Result/artifact directory (default: ${DEFAULT_OUTPUT_DIR})\n  --budget-file <path>   Budget thresholds relative to the repo root (default: ${DEFAULT_BUDGET_FILE})\n  --json                 Print the complete report as JSON\n  --list                 List available tasks without launching Chrome\n`
   )
 }
 
@@ -782,6 +892,14 @@ async function main() {
   }
   if (report.summary.evidenceErrors > 0) {
     console.log(`Warning: ${report.summary.evidenceErrors} evidence capture(s) failed.`)
+  }
+  if (report.budgets.applied) {
+    if (report.budgets.failures.length > 0) {
+      for (const failure of report.budgets.failures) console.error(`Budget: ${failure}`)
+      process.exitCode = 1
+    } else {
+      console.log(`Budgets: within budget (${report.budgets.file}).`)
+    }
   }
   if (report.summary.failed > 0) process.exitCode = 1
 }

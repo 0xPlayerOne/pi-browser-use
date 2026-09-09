@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import {
   clipText,
   deadlineSignal,
+  evaluateBudgets,
   findSnapshotUid,
   parseEvalArgs,
   parseEvaluatedJson,
@@ -254,4 +255,68 @@ it('reports a cleanup failure as a harness failure without masking a passed task
   } finally {
     rmSync(work, { recursive: true, force: true })
   }
+})
+
+const budgetSummary = {
+  attempts: 7,
+  passed: 7,
+  failed: 0,
+  harnessFailures: 0,
+  successRate: 1,
+  toolCalls: 39,
+  evidenceErrors: 0,
+  taskDurationMs: { count: 7, mean: 2, p50: 2, p95: 7.4, max: 8 },
+  startupMs: { count: 7, mean: 0.3, p50: 0.3, p95: 0.5, max: 0.6 },
+  stepDurationMs: { count: 39, mean: 0.2, p50: 0.2, p95: 0.52, max: 0.6 },
+}
+
+it('budget gates pass within thresholds and empty budgets apply nothing', () => {
+  const budgets = {
+    successRate: 1.0,
+    taskP95Ms: 30000,
+    startupP95Ms: 3000,
+    stepP95Ms: 1500,
+    maxHarnessFailures: 0,
+    maxEvidenceErrors: 0,
+    maxToolCalls: 50,
+  }
+  assert.deepEqual(evaluateBudgets(budgetSummary, budgets), { passed: true, failures: [] })
+  assert.deepEqual(evaluateBudgets(budgetSummary, {}), { passed: true, failures: [] })
+})
+
+it('budget gates fail a measured regression with bounded output', () => {
+  const regressed = {
+    ...budgetSummary,
+    passed: 6,
+    failed: 1,
+    successRate: 0.86,
+    harnessFailures: 1,
+    evidenceErrors: 2,
+    stepDurationMs: { count: 39, mean: 0.4, p50: 0.3, p95: 2.4, max: 3 },
+  }
+  const gate = evaluateBudgets(regressed, {
+    successRate: 1,
+    stepP95Ms: 1.5,
+    maxHarnessFailures: 0,
+    maxEvidenceErrors: 0,
+  })
+  assert.equal(gate.passed, false)
+  assert.equal(gate.failures.length, 4)
+})
+
+it('unknown or invalid budget keys fail closed', () => {
+  assert.ok(evaluateBudgets(budgetSummary, { stepP95: 1 }).failures.length > 0)
+  assert.ok(evaluateBudgets(budgetSummary, { successRate: 'always' }).failures.length > 0)
+  assert.ok(evaluateBudgets(budgetSummary, { stepP95Ms: 0 }).failures.length > 0)
+  assert.ok(evaluateBudgets(budgetSummary, { maxToolCalls: -1 }).failures.length > 0)
+  assert.ok(evaluateBudgets(null, {}).failures.length > 0)
+  assert.ok(evaluateBudgets(budgetSummary, null).failures.length > 0)
+})
+
+it('empty stats skip p95 budgets instead of failing', () => {
+  const summary = {
+    ...budgetSummary,
+    startupMs: { count: 0 },
+  }
+  assert.deepEqual(evaluateBudgets(summary, { startupP95Ms: 100 }), { passed: true, failures: [] })
 })
