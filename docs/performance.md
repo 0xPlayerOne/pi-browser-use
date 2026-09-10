@@ -57,3 +57,15 @@ npm run bench -- --startup-only --json
 ```
 
 `perf:audit` and `bench --json` are suitable for machine capture. Use at least seven cold imports and ten runtime iterations when updating the table. Record Node, OS, architecture, commit, and whether Chrome was headless; do not compare results collected with different modes or iteration counts.
+
+## Task-level evaluation
+
+`npm run eval -- --json` runs deterministic browser tasks against fixed DOM fixtures in a fresh isolated session. Each task attempt gets its own runtime and records objective checks, startup/task/step timings, bounded failure text, evidence-capture error counts, and artifact paths in `eval-results/result.json`. Failed attempts save a screenshot by default; use `--evidence all` to capture evidence after every successful step or `--evidence none` to disable it. Failures are classified as `harness` (the browser environment never became usable: startup failed, no step succeeded, or cleanup broke) or `task` (the scenario regressed), and the summary reports `harnessFailures` separately so a broken browser environment is not mistaken for task regressions. Unknown CLI options are rejected. The report contract is documented in [Eval result schema](eval-results.md), including the `eval-budgets.json` gate that mirrors the Code Foundry eval contract.
+
+```sh
+npm run eval -- --iterations 3 --json
+npm run eval -- --task form-submit,extract-list --evidence all
+npm run eval -- --list
+```
+
+These tasks evaluate runtime and browser-tool behavior, not model quality. Keep them deterministic and network-free for local/CI regression checks. Model-agent evaluations should use the same task IDs and metadata but run in a separate harness, with the model, prompt, reasoning budget, dependency hash, and retry policy recorded. Do not silently truncate normal browser results; bounded evidence is only for judge-facing output.

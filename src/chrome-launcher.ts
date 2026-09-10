@@ -224,7 +224,7 @@ class OwnedChromeProcess implements ChromeProcess {
     return this.exitPromise
   }
 
-  async shutdown(graceMs = 3_000): Promise<void> {
+  async shutdown(graceMs = 10_000): Promise<void> {
     if (this.exited) return
     this.child.kill('SIGTERM')
     const exited = await Promise.race([
