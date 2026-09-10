@@ -16,9 +16,9 @@ tooling can pin to the shape it parses.
 | `node`           | `string` | Node version, e.g. `v22.12.0`.                                                                                                |
 | `platform`       | `string` | `process.platform-process.arch`.                                                                                              |
 | `config`         | `object` | Effective run settings: `mode`, `headed`, `fixture`, `evidence`, `timeoutMs`.                                                 |
-| `iterations`     | `number` | Attempts per task.                                                          |
-| `budgets`        | `object` | `{ file, applied, failures }` — outcome of the `eval-budgets.json` gate (see below). |
-| `tasks`          | `array`  | One entry per selected task (see Task).                                     |
+| `iterations`     | `number` | Attempts per task.                                                                                                            |
+| `budgets`        | `object` | `{ file, applied, failures }` — outcome of the `eval-budgets.json` gate (see below).                                          |
+| `tasks`          | `array`  | One entry per selected task (see Task).                                                                                       |
 | `summary`        | `object` | Aggregate over all attempts (see Summary).                                                                                    |
 | `resultPath`     | `string` | Absolute path of the file itself.                                                                                             |
 

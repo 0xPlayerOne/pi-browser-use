@@ -149,6 +149,7 @@ node src/runtime.mjs ci unit
 node src/runtime.mjs ci integration
 node src/runtime.mjs ci e2e
 node src/runtime.mjs ci smoke
+node src/runtime.mjs ci eval
 node src/runtime.mjs ci performance
 Security and dependency audits run through the GitHub Security workflow.
 ```
