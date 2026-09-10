@@ -333,3 +333,18 @@ it('a failed backend switch closes partially launched resources', async (t) => {
   assert.equal(stopped, 1)
   assert.equal(f.clients[0].closed, 1)
 })
+
+it('restarts an owned backend after Chrome exits while the host session remains alive', async (t) => {
+  const f = fixture(t)
+  await f.call('new_page', { url: 'https://example.test/' })
+  assert.equal(f.backends.length, 1)
+
+  // Simulate the process watcher reporting an unexpected Chrome exit without
+  // ending the host session that owns the runtime.
+  f.backends[0].stopped = 1
+  await f.call('new_page', { url: 'https://example.test/again' })
+
+  assert.equal(f.backends.length, 2)
+  assert.equal(f.clients[0].closed, 1)
+  assert.equal(f.backends[1].started, 1)
+})
