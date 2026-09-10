@@ -41,6 +41,8 @@ Budgets live in [`performance-budgets.json`](../performance-budgets.json). They 
 | Published map files               |             0 |
 | Production dependency closure     |  140 packages |
 
+The published artifact stays byte-lean by design: `tsconfig.json` sets `removeComments` so emitted JavaScript and declarations carry no comment bytes, and build maps never ship. Source commentary lives in the repository, not in the installed package.
+
 ## Reproduce locally and in CI
 
 ```sh

@@ -53,10 +53,11 @@ describe('existing-mode tab broker extension', () => {
     )
   })
 
-  it('wakes a suspended worker via repeating alarm (setInterval dies with MV3 workers)', () => {
+  it('wakes a suspended worker via repeating alarm without a persistent timer', () => {
     assert.ok(manifest.permissions.includes('alarms'), 'needs alarms to wake the worker')
     assert.match(background, /alarms\?\.create\(PI_BRIDGE_ALARM/)
     assert.match(background, /onAlarm\.addListener/)
     assert.match(background, /periodInMinutes: 1/)
+    assert.ok(!background.includes('setInterval('), 'must not keep Chrome alive with a timer')
   })
 })

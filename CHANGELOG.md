@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.0...pi-browser-use-v0.11.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* **browser:** release Chrome ownership after exit ([#47](https://github.com/0xPlayerOne/pi-browser-use/issues/47)) ([fdc7f39](https://github.com/0xPlayerOne/pi-browser-use/commit/fdc7f39dbd14f3da9b6b8c3716e26fba6df4c0ac))
+
 ## [0.11.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.10.1...pi-browser-use-v0.11.0) (2026-09-10)
 
 
