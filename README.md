@@ -21,7 +21,7 @@ Not affiliated with `@amaster.ai/pi-browser-use` or `@narumitw/pi-chrome-devtool
 pi install npm:pi-browser-use
 ```
 
-Requires Node.js `^20.19.0 || ^22.12.0 || >=23` and Chrome stable or newer.
+Requires Node.js `>=24` and Chrome stable or newer.
 
 ## Configure
 
