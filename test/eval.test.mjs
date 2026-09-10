@@ -8,6 +8,8 @@ import {
   deadlineSignal,
   evaluateBudgets,
   findSnapshotUid,
+  fixtureScript,
+  fixtureUrl,
   parseEvalArgs,
   parseEvaluatedJson,
   runAttempt,
@@ -40,6 +42,13 @@ it('reports p50, p95 and max timing statistics', () => {
     max: 4,
   })
   assert.deepEqual(stats([]), { count: 0 })
+})
+
+it('keeps fixture markup out of generated JavaScript source', () => {
+  const html = '</script><script>globalThis.fixtureInjected = true</script>'
+  assert.equal(fixtureUrl(html), `about:blank#${encodeURIComponent(html)}`)
+  assert.equal(fixtureScript().includes(html), false)
+  assert.match(fixtureScript(), /decodeURIComponent\(location\.hash\.slice\(1\)\)/)
 })
 
 it('finds accessibility uids by role and accessible name', () => {
