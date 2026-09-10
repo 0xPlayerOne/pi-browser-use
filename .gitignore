@@ -41,8 +41,6 @@ htmlcov/
 artifacts/
 performance-results.json
 performance-results/
-eval-results.json
-eval-results/
 cache/
 !.github/actions/cache/
 !.github/actions/cache/action.yml
@@ -82,4 +80,5 @@ mise.local.lock
 *.code-workspace
 
 # Repository-specific rules
+eval-results.json
 eval-results/
