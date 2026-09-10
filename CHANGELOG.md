@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.3](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.2...pi-browser-use-v0.11.3) (2026-09-10)
+
+
+### Bug Fixes
+
+* **eval:** avoid interpolating fixture HTML into code ([#50](https://github.com/0xPlayerOne/pi-browser-use/issues/50)) ([b2da963](https://github.com/0xPlayerOne/pi-browser-use/commit/b2da96307c2008b7be7e454935594b37fd99c670))
+
 ## [0.11.2](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.1...pi-browser-use-v0.11.2) (2026-09-10)
 
 
