@@ -112,7 +112,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
  * The bridge URL override lives in local storage (default loopback port).
  */
 const PI_BRIDGE_DEFAULT_URL = 'http://127.0.0.1:31973'
-const PI_BRIDGE_POLL_MS = 2000
 let piBridgeUrlOverride = null
 
 try {
@@ -163,15 +162,11 @@ async function pollBridgeOnce() {
   }
 }
 
-setInterval(() => {
-  void pollBridgeOnce().catch(() => {})
-}, PI_BRIDGE_POLL_MS)
-
 /**
- * MV3 service workers are short-lived: setInterval dies permanently once the
- * worker is evicted, so the fast poll above only covers the awake case. The
- * repeating alarm wakes a suspended worker and guarantees a poll at least
- * every minute (safe floor for the alarm cadence). Re-created on every
+ * MV3 service workers are short-lived, and a persistent timer can keep Chrome
+ * alive after the user closes its windows. Use an alarm instead: it wakes a
+ * suspended worker without holding the browser open, and guarantees a poll at
+ * least every minute (safe floor for the alarm cadence). Re-created on every
  * startup since alarm persistence across restarts is not guaranteed.
  */
 const PI_BRIDGE_ALARM = 'pi-bridge-poll'

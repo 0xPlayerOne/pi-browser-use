@@ -103,6 +103,38 @@ export class PersistentBackend {
   }
 
   /**
+   * Release ownership as soon as Chrome exits, even when the host session is
+   * still alive. Otherwise the host pid keeps the profile lock/advert looking
+   * live and later sessions attach to a dead DevTools endpoint.
+   */
+  private onChromeExit(chrome: ChromeProcess): void {
+    if (this.chrome !== chrome) return
+    this.chrome = undefined
+    const lock = this.lock
+    this.lock = undefined
+    try {
+      lock?.release()
+    } catch {
+      // Lock implementations are best effort during unexpected exits.
+    }
+    withdrawAdvert(this.profileDir(), this.sessionId)
+    const client = this.client
+    this.client = undefined
+    if (client) void client.close().catch(() => {})
+  }
+
+  private watchChrome(chrome: ChromeProcess): void {
+    try {
+      void chrome.waitForExit().then(
+        () => this.onChromeExit(chrome),
+        () => this.onChromeExit(chrome)
+      )
+    } catch {
+      this.onChromeExit(chrome)
+    }
+  }
+
+  /**
    * Kill leftover Pi-managed Chromes on this profile (crashed sessions).
    * Only processes carrying our managed flags; skips our own pid and
    * manually opened windows. Injectable runner for tests.
@@ -151,6 +183,9 @@ export class PersistentBackend {
    * otherwise the caller builds its DevToolsClient from `attachConfig()`.
    */
   async start(signal?: AbortSignal): Promise<BrowserUseConfig> {
+    // The child exit event and its watcher callback run in separate microtasks.
+    // Clean up synchronously when a caller retries in that small window.
+    if (this.chrome?.exited) this.onChromeExit(this.chrome)
     if (this.running()) return this.attachConfig()
     if (signal?.aborted) throw new Error('Persistent backend start aborted.')
     const profileDir = this.profileDir()
@@ -184,7 +219,7 @@ export class PersistentBackend {
       // Explicit headed wins; otherwise infer from config (headless:false
       // means headed) so direct construction can't silently go headless.
       const headed = this.options.headed ?? this.options.config.headless === false
-      this.chrome = await this.launch({
+      const chrome = await this.launch({
         userDataDir: profileDir,
         profileDirectory: PI_PROFILE_NAME,
         headless: !headed,
@@ -192,6 +227,8 @@ export class PersistentBackend {
         executablePath: this.options.config.executablePath,
         signal,
       })
+      this.chrome = chrome
+      this.watchChrome(chrome)
     } catch (error) {
       this.lock.release()
       this.lock = undefined

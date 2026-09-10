@@ -453,6 +453,13 @@ export function createBrowserRuntime(options: BrowserRuntimeOptions = {}) {
   async function ensureConnected(signal?: AbortSignal) {
     signal?.throwIfAborted()
     try {
+      // A user can close the Pi-owned headed window, or Chrome can exit on
+      // its own, while the host session remains alive. Do not reconnect an
+      // MCP client to the dead port; let the backend release/reacquire its
+      // profile ownership and launch a fresh browser instead.
+      if (backendInitialized && ownBackend && !ownBackend.running()) {
+        await teardownBackend()
+      }
       if (!backendInitialized) {
         await client?.close()
         if (currentMode === 'persistent' && shouldSelfLaunch(config)) {

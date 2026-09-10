@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PersistentBackend, shouldSelfLaunch } from '../dist/persistent-backend.js'
 import { ProfileLockedError } from '../dist/profile-lock.js'
-import { advertiseBackend } from '../dist/shared-backend.js'
+import { advertiseBackend, readLiveAdvert } from '../dist/shared-backend.js'
 
 function makeChrome(port = 54321) {
   return {
@@ -14,7 +14,7 @@ function makeChrome(port = 54321) {
     browserUrl: `http://127.0.0.1:${port}`,
     userDataDir: '/tmp/pi-profile',
     exited: false,
-    waitForExit: async () => 0,
+    waitForExit: () => new Promise(() => {}),
     shutdown: async () => {},
   }
 }
@@ -34,9 +34,7 @@ describe('PersistentBackend', () => {
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'pi-backend-'))
   })
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true })
-  })
+  afterEach(() => sweep(dir))
 
   it('starts Chrome and builds a browserUrl attach config without launch fields', async () => {
     const seen = []
@@ -153,6 +151,35 @@ describe('PersistentBackend', () => {
     } finally {
       await backend.stop()
     }
+  })
+
+  it('releases profile ownership when owned Chrome exits unexpectedly', async () => {
+    const exit = Promise.withResolvers()
+    let released = 0
+    const backend = new PersistentBackend({
+      config: { sessionMode: 'persistent', headless: true, userDataDir: dir },
+      launch: async () => ({
+        ...makeChrome(),
+        waitForExit: () => exit.promise,
+      }),
+      lock: () => ({
+        ...makeLock(),
+        release() {
+          released += 1
+        },
+      }),
+    })
+    await backend.start()
+    assert.equal(backend.running(), true)
+
+    exit.resolve(0)
+    for (let attempt = 0; backend.running() && attempt < 20; attempt++)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+    assert.equal(backend.running(), false)
+    assert.equal(released, 1)
+    assert.equal(readLiveAdvert(dir), undefined)
+    await backend.stop()
   })
 })
 

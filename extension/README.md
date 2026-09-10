@@ -17,6 +17,8 @@ default, override via `tabBridgePort` in `pi-browser-use` settings plus the
 extension's stored `piBridgeUrl`) for open-tab requests, creates each tab
 inactive in the `pi-browser-use` group, keeps the group collapsed, and
 reports back per-token so Pi selects the exact tab — never by URL matching.
+Polling is event-driven plus a one-minute alarm; it does not run a persistent
+timer that can keep Chrome alive after its windows are closed.
 
 ## Permissions
 
