@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.10.1...pi-browser-use-v0.11.0) (2026-09-10)
+
+
+### Features
+
+* **eval:** deterministic browser evaluator on Code Foundry v1.25.3 ([#44](https://github.com/0xPlayerOne/pi-browser-use/issues/44)) ([8ee4a9c](https://github.com/0xPlayerOne/pi-browser-use/commit/8ee4a9c363b94bdc7d1549742b2ac9ef13095abe))
+
 ## [0.10.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.10.0...pi-browser-use-v0.10.1) (2026-09-08)
 
 
