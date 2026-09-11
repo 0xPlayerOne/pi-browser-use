@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.4](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.3...pi-browser-use-v0.11.4) (2026-09-11)
+
+
+### Maintenance
+
+* **config:** right-size runner lanes and drop default shard overrides ([#53](https://github.com/0xPlayerOne/pi-browser-use/issues/53)) ([ad5b3ca](https://github.com/0xPlayerOne/pi-browser-use/commit/ad5b3caca26cbb29c4ca44d5a89eb3039a14753e))
+
 ## [0.11.3](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.2...pi-browser-use-v0.11.3) (2026-09-10)
 
 
