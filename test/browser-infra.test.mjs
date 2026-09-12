@@ -267,6 +267,118 @@ it('DevTools endpoint polling propagates cancellation rather than waiting for ti
   await assert.rejects(pending, /poll cancelled/)
 })
 
+const refusingFetch = async () => {
+  throw new TypeError('fetch failed', { cause: new Error('connect ECONNREFUSED 127.0.0.1:1') })
+}
+
+it('DevTools endpoint timeout surfaces the underlying connect error', async () => {
+  await assert.rejects(
+    () => waitForDevToolsEndpoint(1, { timeoutMs: 250, fetchImpl: refusingFetch }),
+    (error) => {
+      assert.equal(error.name, 'DevToolsReadyTimeoutError')
+      assert.match(error.message, /Timed out waiting for Chrome DevTools/)
+      assert.match(error.message, /ECONNREFUSED/)
+      return true
+    }
+  )
+})
+
+describe('chrome launch readiness', { skip: process.platform === 'win32' }, () => {
+  it('fails fast when Chrome exits before the DevTools endpoint opens', async (t) => {
+    const { writeFileSync, chmodSync } = await import('node:fs')
+    const { launchChrome } = await import('../dist/chrome-launcher.js')
+    const dir = mkdtempSync(join(tmpdir(), 'chrome-ready-exit-'))
+    t.after(() => rmSync(dir, { recursive: true, force: true }))
+    const fake = join(dir, 'fake-chrome')
+    writeFileSync(fake, '#!/bin/sh\nsleep 0.3\nexit 3\n', { mode: 0o755 })
+    chmodSync(fake, 0o755)
+    const started = Date.now()
+    await assert.rejects(
+      () =>
+        launchChrome({
+          userDataDir: join(dir, 'profile'),
+          executablePath: fake,
+          readyTimeoutMs: 10_000,
+          launchAttempts: 1,
+        }),
+      /Chrome exited \(code 3\) before the DevTools endpoint/
+    )
+    assert.ok(Date.now() - started < 9_000, 'must not burn the whole readiness window')
+  })
+
+  it('retries a slow start and succeeds on the next attempt', async (t) => {
+    const { writeFileSync, chmodSync, readFileSync } = await import('node:fs')
+    const { launchChrome } = await import('../dist/chrome-launcher.js')
+    const dir = mkdtempSync(join(tmpdir(), 'chrome-ready-retry-'))
+    t.after(() => rmSync(dir, { recursive: true, force: true }))
+    const counter = join(dir, 'attempts')
+    const server = join(dir, 'fake-chrome.mjs')
+    writeFileSync(
+      server,
+      `import { createServer } from 'node:http'
+import { readFileSync, writeFileSync } from 'node:fs'
+const portArg = process.argv.find((a) => a.startsWith('--remote-debugging-port=')) ?? ''
+const port = Number(portArg.split('=')[1])
+let runs = 0
+try { runs = Number(readFileSync(${JSON.stringify(counter)}, 'utf8')) } catch {}
+runs += 1
+writeFileSync(${JSON.stringify(counter)}, String(runs))
+if (runs === 1) {
+  setTimeout(() => process.exit(0), 60_000)
+} else {
+  createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ webSocketDebuggerUrl: \`ws://127.0.0.1:\${port}/devtools/browser\` }))
+  }).listen(port, '127.0.0.1')
+  setInterval(() => {}, 60_000)
+}
+`
+    )
+    const fake = join(dir, 'fake-chrome')
+    writeFileSync(fake, `#!/bin/sh\nexec "\${FAKE_CHROME_NODE:-node}" '${server}' "$@"\n`, {
+      mode: 0o755,
+    })
+    chmodSync(fake, 0o755)
+    process.env.FAKE_CHROME_NODE = process.execPath
+    t.after(() => delete process.env.FAKE_CHROME_NODE)
+    const chrome = await launchChrome({
+      userDataDir: join(dir, 'profile'),
+      executablePath: fake,
+      readyTimeoutMs: 500,
+      launchAttempts: 2,
+    })
+    t.after(() => chrome.shutdown())
+    assert.equal(readFileSync(counter, 'utf8'), '2')
+    assert.match(chrome.browserUrl, /^http:\/\/127\.0\.0\.1:\d+$/)
+  })
+
+  it('reports exhausted attempts instead of a single-window timeout', async (t) => {
+    const { writeFileSync, chmodSync } = await import('node:fs')
+    const { launchChrome } = await import('../dist/chrome-launcher.js')
+    const dir = mkdtempSync(join(tmpdir(), 'chrome-ready-exhaust-'))
+    t.after(() => rmSync(dir, { recursive: true, force: true }))
+    const fake = join(dir, 'fake-chrome')
+    writeFileSync(fake, '#!/bin/sh\nexec sleep 30\n', { mode: 0o755 })
+    chmodSync(fake, 0o755)
+    const started = Date.now()
+    await assert.rejects(
+      () =>
+        launchChrome({
+          userDataDir: join(dir, 'profile'),
+          executablePath: fake,
+          readyTimeoutMs: 300,
+          launchAttempts: 2,
+        }),
+      (error) => {
+        assert.match(error.message, /Timed out waiting for Chrome DevTools/)
+        assert.match(error.message, /\(2 launch attempts\)/)
+        return true
+      }
+    )
+    assert.ok(Date.now() - started >= 600, 'both readiness windows must elapse')
+  })
+})
+
 it(
   'cancelling a plain setup closes its owned process',
   { skip: process.platform === 'win32' },

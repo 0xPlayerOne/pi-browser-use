@@ -139,7 +139,9 @@ async function probe(stage, termination) {
   const exit = once(child, 'exit')
   async function request(method, params) {
     const requestId = ++id
-    const response = once(responses, String(requestId), { signal: AbortSignal.timeout(30_000) })
+    // A cold runner start can spend two launcher readiness windows before the
+    // DevTools endpoint answers; 90s keeps that inside the probe deadline.
+    const response = once(responses, String(requestId), { signal: AbortSignal.timeout(90_000) })
     child.stdin.write(
       JSON.stringify({ jsonrpc: '2.0', id: requestId, method, ...(params ? { params } : {}) }) +
         '\n'

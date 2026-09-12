@@ -19,6 +19,7 @@
 
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { once } from 'node:events'
 import { createServer } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
 
@@ -32,8 +33,15 @@ export interface ChromeLaunchOptions {
   /** Extra Chrome flags appended after the managed ones. */
   chromeArgs?: string[]
   executablePath?: string
-  /** How long to wait for the DevTools endpoint. Default 15s. */
+  /** How long to wait for the DevTools endpoint per launch attempt. Default 15s. */
   readyTimeoutMs?: number
+  /**
+   * Launch attempts before giving up. Retries only cover slow starts
+   * (Chrome alive, endpoint never ready — e.g. cold CI runners); a Chrome
+   * that exits early fails immediately. Each attempt uses a fresh port.
+   * Default 2.
+   */
+  launchAttempts?: number
   signal?: AbortSignal
 }
 
@@ -160,6 +168,29 @@ export function buildChromeArgs(options: {
   return args
 }
 
+/**
+ * Chrome stayed alive but its DevTools endpoint never answered within the
+ * readiness window — typically a slow start on a loaded machine, not a crash.
+ */
+export class DevToolsReadyTimeoutError extends Error {
+  constructor(browserUrl: string, timeoutMs: number, lastError: unknown) {
+    super(
+      `Timed out waiting for Chrome DevTools on ${browserUrl} after ${timeoutMs}ms (${describeError(lastError)})`
+    )
+    this.name = 'DevToolsReadyTimeoutError'
+  }
+}
+
+/** fetch() wraps connect failures in an opaque TypeError; surface the cause. */
+function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    const cause = (error as { cause?: unknown }).cause
+    if (cause instanceof Error && cause.message) return cause.message
+    return error.message
+  }
+  return String(error)
+}
+
 /** Poll the DevTools `/json/version` endpoint until it answers or times out. */
 export async function waitForDevToolsEndpoint(
   port: number,
@@ -187,9 +218,7 @@ export async function waitForDevToolsEndpoint(
     }
     await delay(100, undefined, { signal: options?.signal })
   }
-  throw new Error(
-    `Timed out waiting for Chrome DevTools on ${browserUrl} (${lastError instanceof Error ? lastError.message : String(lastError)})`
-  )
+  throw new DevToolsReadyTimeoutError(browserUrl, timeoutMs, lastError)
 }
 
 class OwnedChromeProcess implements ChromeProcess {
@@ -247,43 +276,83 @@ class OwnedChromeProcess implements ChromeProcess {
 }
 
 /**
+ * Wait for the DevTools endpoint, but fail immediately when Chrome exits
+ * first — a dead process never opens the endpoint, and burning the whole
+ * readiness window would only mask the real failure.
+ */
+async function waitReadyWatchingExit(
+  child: ChildProcess,
+  port: number,
+  timeoutMs: number | undefined,
+  signal: AbortSignal | undefined
+): Promise<void> {
+  const endpointReady = waitForDevToolsEndpoint(port, { timeoutMs, signal })
+  const exited = once(child, 'exit')
+  // Losing the race must not surface later as an unhandled rejection.
+  exited.catch(() => {})
+  try {
+    await Promise.race([
+      endpointReady,
+      exited.then(([code, exitSignal]) => {
+        const reason = code !== null ? `code ${code}` : `signal ${exitSignal ?? 'unknown'}`
+        throw new Error(
+          `Chrome exited (${reason}) before the DevTools endpoint on http://127.0.0.1:${port} opened.`
+        )
+      }),
+    ])
+  } catch (error) {
+    endpointReady.catch(() => {})
+    throw error
+  }
+}
+
+/**
  * Launch Pi-owned Chrome. The caller must hold the profile lock
  * (see `profile-lock.ts`) for `userDataDir` before calling.
  */
 export async function launchChrome(options: ChromeLaunchOptions): Promise<ChromeProcess> {
   options.signal?.throwIfAborted()
   const executable = findChromeExecutable(options.executablePath)
-  const port = options.port ?? (await allocateEphemeralPort())
-  const args = buildChromeArgs({
-    userDataDir: options.userDataDir,
-    profileDirectory: options.profileDirectory,
-    port,
-    headless: options.headless,
-    chromeArgs: options.chromeArgs,
-  })
-  const child = spawn(executable, args, { stdio: 'ignore', detached: false })
-  await new Promise<void>((resolve, reject) => {
-    child.on('error', reject)
-    // Give spawn a tick to surface ENOENT-style failures before probing.
-    setTimeout(resolve, 50)
-  })
-  if (child.exitCode !== null) {
-    throw new Error(`Chrome exited immediately (code ${child.exitCode}).`)
-  }
-  try {
-    await waitForDevToolsEndpoint(port, {
-      timeoutMs: options.readyTimeoutMs,
-      signal: options.signal,
+  const attempts = Math.max(1, options.launchAttempts ?? 2)
+  let lastError: unknown
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    options.signal?.throwIfAborted()
+    const port = options.port ?? (await allocateEphemeralPort())
+    const args = buildChromeArgs({
+      userDataDir: options.userDataDir,
+      profileDirectory: options.profileDirectory,
+      port,
+      headless: options.headless,
+      chromeArgs: options.chromeArgs,
     })
-  } catch (error) {
-    try {
-      child.kill('SIGKILL')
-    } catch {
-      // Already gone; the endpoint error below is what matters.
+    const child = spawn(executable, args, { stdio: 'ignore', detached: false })
+    await new Promise<void>((resolve, reject) => {
+      child.on('error', reject)
+      // Give spawn a tick to surface ENOENT-style failures before probing.
+      setTimeout(resolve, 50)
+    })
+    if (child.exitCode !== null) {
+      throw new Error(`Chrome exited immediately (code ${child.exitCode}).`)
     }
-    throw error
+    try {
+      await waitReadyWatchingExit(child, port, options.readyTimeoutMs, options.signal)
+      return new OwnedChromeProcess(child, port, `http://127.0.0.1:${port}`, options.userDataDir)
+    } catch (error) {
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        // Already gone; the readiness error below is what matters.
+      }
+      lastError = error
+      // Retry only slow starts (endpoint never became ready); crashes and
+      // aborts are rethrown as-is.
+      if (!(error instanceof DevToolsReadyTimeoutError)) throw error
+    }
   }
-  return new OwnedChromeProcess(child, port, `http://127.0.0.1:${port}`, options.userDataDir)
+  if (lastError instanceof DevToolsReadyTimeoutError && attempts > 1) {
+    lastError.message += ` (${attempts} launch attempts)`
+  }
+  throw lastError
 }
 
 /**
