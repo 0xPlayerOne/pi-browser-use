@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.11.6](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.5...pi-browser-use-v0.11.6) (2026-09-11)
+
+
+### Maintenance
+
+* **code-foundry:** upgrade runtime to v1.28.14 ([#57](https://github.com/0xPlayerOne/pi-browser-use/issues/57)) ([eea45c3](https://github.com/0xPlayerOne/pi-browser-use/commit/eea45c367e2e78af24b857184630b109405e8429))
+
+## [0.11.5](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.4...pi-browser-use-v0.11.5) (2026-09-11)
+
+
+### Maintenance
+
+* **code-foundry:** upgrade runtime to v1.28.11 ([#55](https://github.com/0xPlayerOne/pi-browser-use/issues/55)) ([bb33ad2](https://github.com/0xPlayerOne/pi-browser-use/commit/bb33ad299ac41d3f8fe4b743e0dc4bf1529184fc))
+
+## [0.11.4](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.3...pi-browser-use-v0.11.4) (2026-09-11)
+
+
+### Maintenance
+
+* **config:** right-size runner lanes and drop default shard overrides ([#53](https://github.com/0xPlayerOne/pi-browser-use/issues/53)) ([ad5b3ca](https://github.com/0xPlayerOne/pi-browser-use/commit/ad5b3caca26cbb29c4ca44d5a89eb3039a14753e))
+
+## [0.11.3](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.2...pi-browser-use-v0.11.3) (2026-09-10)
+
+
+### Bug Fixes
+
+* **eval:** avoid interpolating fixture HTML into code ([#50](https://github.com/0xPlayerOne/pi-browser-use/issues/50)) ([b2da963](https://github.com/0xPlayerOne/pi-browser-use/commit/b2da96307c2008b7be7e454935594b37fd99c670))
+
+## [0.11.2](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.1...pi-browser-use-v0.11.2) (2026-09-10)
+
+
+### Maintenance
+
+* **code-foundry:** upgrade runtime to v1.28.4 ([3a34ba7](https://github.com/0xPlayerOne/pi-browser-use/commit/3a34ba7f1841004b5ebc660b165237f4ec32cf74))
+
 ## [0.11.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.0...pi-browser-use-v0.11.1) (2026-09-10)
 
 

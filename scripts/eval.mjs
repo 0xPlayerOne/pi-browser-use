@@ -262,8 +262,13 @@ export function parseEvalArgs(argv = process.argv.slice(2)) {
   }
 }
 
-function fixtureScript(html) {
-  return `() => { document.open(); document.write(${JSON.stringify(html)}); document.close(); return 'fixture-ready'; }`
+export function fixtureUrl(html) {
+  // Keep fixture markup in URL data rather than interpolating it into JavaScript source.
+  return `about:blank#${encodeURIComponent(html)}`
+}
+
+export function fixtureScript() {
+  return "() => { document.open(); document.write(decodeURIComponent(location.hash.slice(1))); document.close(); return 'fixture-ready'; }"
 }
 
 function requireCondition(condition, message) {
@@ -298,7 +303,13 @@ async function preparePage(context, html) {
   const pageId = pageIdFromList(pages)
   context.setPageId(pageId)
   await context.call('take_snapshot', { pageId })
-  await context.call('evaluate_script', { pageId, function: fixtureScript(html) })
+  await context.call('navigate_page', {
+    pageId,
+    type: 'url',
+    url: fixtureUrl(html),
+  })
+  await context.call('take_snapshot', { pageId })
+  await context.call('evaluate_script', { pageId, function: fixtureScript() })
   const snapshot = await context.call('take_snapshot', { pageId })
   return { pageId, snapshot: resultText(snapshot) }
 }
