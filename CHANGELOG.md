@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.7](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.6...pi-browser-use-v0.11.7) (2026-09-12)
+
+
+### Bug Fixes
+
+* **browser:** harden Chrome DevTools readiness against slow starts ([#59](https://github.com/0xPlayerOne/pi-browser-use/issues/59)) ([dd8bd6d](https://github.com/0xPlayerOne/pi-browser-use/commit/dd8bd6dd71f215c750a6dc19e28a5e4ad152c47e)), closes [#51](https://github.com/0xPlayerOne/pi-browser-use/issues/51)
+
 ## [0.11.6](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.5...pi-browser-use-v0.11.6) (2026-09-11)
 
 
