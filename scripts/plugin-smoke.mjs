@@ -23,7 +23,6 @@ import { parseMcpPageList } from '../dist/existing-flow.js'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const withBrowser = process.argv.includes('--browser')
 const work = mkdtempSync(join(tmpdir(), 'browser-plugin-smoke-'))
-const json = (path) => JSON.parse(readFileSync(path, 'utf8'))
 
 function command(name, args, cwd = root) {
   const result = spawnSync(name, args, { cwd, encoding: 'utf8' })
@@ -44,9 +43,9 @@ function parseLockText(text) {
 
 function productionPackageNames(lock) {
   const packages = lock.packages ?? {}
-  const root = lock.workspaces?.[''] ?? {}
+  const workspaceRoot = lock.workspaces?.[''] ?? {}
   const names = new Set()
-  const pending = Object.keys(root.dependencies ?? {})
+  const pending = Object.keys(workspaceRoot.dependencies ?? {})
   while (pending.length) {
     const name = pending.pop()
     if (!name || names.has(name)) continue
@@ -56,7 +55,7 @@ function productionPackageNames(lock) {
     const meta = Array.isArray(packages[key]) ? (packages[key][2] ?? {}) : {}
     for (const dep of Object.keys(meta.dependencies ?? {})) pending.push(dep)
     for (const dep of Object.keys(meta.optionalDependencies ?? {})) pending.push(dep)
-    for (const [dep, range] of Object.entries(meta.peerDependencies ?? {})) {
+    for (const dep of Object.keys(meta.peerDependencies ?? {})) {
       if (meta.peerDependenciesMeta?.[dep]?.optional !== true) pending.push(dep)
     }
   }

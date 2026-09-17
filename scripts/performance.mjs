@@ -97,9 +97,9 @@ function parseLockText(text) {
 
 function productionPackageNames(lock) {
   const packages = lock.packages ?? {}
-  const root = lock.workspaces?.[''] ?? {}
+  const workspaceRoot = lock.workspaces?.[''] ?? {}
   const names = new Set()
-  const pending = Object.keys(root.dependencies ?? {})
+  const pending = Object.keys(workspaceRoot.dependencies ?? {})
   while (pending.length) {
     const name = pending.pop()
     if (!name || names.has(name)) continue
@@ -109,18 +109,19 @@ function productionPackageNames(lock) {
     const meta = Array.isArray(packages[key]) ? (packages[key][2] ?? {}) : {}
     for (const dep of Object.keys(meta.dependencies ?? {})) pending.push(dep)
     for (const dep of Object.keys(meta.optionalDependencies ?? {})) pending.push(dep)
-    for (const [dep, range] of Object.entries(meta.peerDependencies ?? {})) {
+    for (const dep of Object.keys(meta.peerDependencies ?? {})) {
       if (meta.peerDependenciesMeta?.[dep]?.optional !== true) pending.push(dep)
     }
   }
   return names
 }
 
-export function countProductionDependencies(root) {
-  const bunLockPath = resolve(root, 'bun.lock')
+export function countProductionDependencies(repoRoot) {
+  const bunLockPath = resolve(repoRoot, 'bun.lock')
   if (existsSync(bunLockPath)) {
     return productionPackageNames(parseLockText(readFileSync(bunLockPath, 'utf8'))).size
   }
+  const lock = JSON.parse(readFileSync(resolve(repoRoot, 'package-lock.json'), 'utf8'))
   const packages = lock.packages
   const rootPackage = packages['']
   const pending = Object.keys(rootPackage.dependencies ?? {}).map((name) => `node_modules/${name}`)
