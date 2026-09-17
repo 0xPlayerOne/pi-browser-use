@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.9](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.8...pi-browser-use-v0.11.9) (2026-09-17)
+
+
+### Maintenance
+
+* align toolchain with fleet standard and adopt runtime v1.30.0 ([#68](https://github.com/0xPlayerOne/pi-browser-use/issues/68)) ([34bb1af](https://github.com/0xPlayerOne/pi-browser-use/commit/34bb1afd2b74b1c4188943c3bcc71d0a71bba40f))
+
 ## [0.11.8](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.7...pi-browser-use-v0.11.8) (2026-09-17)
 
 
