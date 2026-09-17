@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.8](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.7...pi-browser-use-v0.11.8) (2026-09-17)
+
+
+### Maintenance
+
+* standardize lint and format toolchain ([#63](https://github.com/0xPlayerOne/pi-browser-use/issues/63)) ([560477e](https://github.com/0xPlayerOne/pi-browser-use/commit/560477e9526422b987e93c3d8add2cc2ba95d243))
+
 ## [0.11.7](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.6...pi-browser-use-v0.11.7) (2026-09-12)
 
 
