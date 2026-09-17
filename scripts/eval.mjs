@@ -614,10 +614,11 @@ function errorInfo(error) {
 }
 
 function dependencyHash() {
+  const lockPath = existsSync(resolve(ROOT, 'bun.lock'))
+    ? resolve(ROOT, 'bun.lock')
+    : resolve(ROOT, 'package-lock.json')
   try {
-    return createHash('sha256')
-      .update(readFileSync(resolve(ROOT, 'package-lock.json')))
-      .digest('hex')
+    return createHash('sha256').update(readFileSync(lockPath)).digest('hex')
   } catch {
     return 'unknown'
   }

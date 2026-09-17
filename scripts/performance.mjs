@@ -6,7 +6,7 @@
  * artifact footprint, and the production dependency closure in package-lock.
  */
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -74,8 +74,7 @@ function measurePackage() {
     throw new Error(`npm pack probe failed: ${packed.stderr.trim() || `exit ${packed.status}`}`)
   }
   const [artifact] = JSON.parse(packed.stdout)
-  const lock = JSON.parse(readFileSync(resolve(root, 'package-lock.json'), 'utf8'))
-  const productionDependencyCount = countProductionDependencies(lock)
+  const productionDependencyCount = countProductionDependencies(root)
   return {
     packedBytes: artifact.size,
     unpackedBytes: artifact.unpackedSize,
@@ -85,7 +84,49 @@ function measurePackage() {
   }
 }
 
-export function countProductionDependencies(lock) {
+function parseLockText(text) {
+  return JSON.parse(
+    text
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('//'))
+      .map((line) => line.replace(/\s\/\/.*$/, ''))
+      .join('\n')
+      .replace(/,(\s*[}\]])/g, '$1')
+  )
+}
+
+function productionPackageNames(lock) {
+  const packages = lock.packages ?? {}
+  const workspaceRoot = lock.workspaces?.[''] ?? {}
+  const names = new Set()
+  const pending = Object.keys(workspaceRoot.dependencies ?? {})
+  while (pending.length) {
+    const name = pending.pop()
+    if (!name || names.has(name)) continue
+    const key = Object.keys(packages).find((k) => k === name || k.startsWith(`${name}@`))
+    if (!key) continue
+    names.add(name)
+    const meta = Array.isArray(packages[key]) ? (packages[key][2] ?? {}) : {}
+    for (const dep of Object.keys(meta.dependencies ?? {})) pending.push(dep)
+    for (const dep of Object.keys(meta.optionalDependencies ?? {})) pending.push(dep)
+    for (const dep of Object.keys(meta.peerDependencies ?? {})) {
+      if (meta.peerDependenciesMeta?.[dep]?.optional !== true) pending.push(dep)
+    }
+  }
+  return names
+}
+
+export function countProductionDependencies(source) {
+  if (typeof source === 'string') {
+    const bunLockPath = resolve(source, 'bun.lock')
+    if (existsSync(bunLockPath)) {
+      return productionPackageNames(parseLockText(readFileSync(bunLockPath, 'utf8'))).size
+    }
+    return countProductionDependencies(
+      JSON.parse(readFileSync(resolve(source, 'package-lock.json'), 'utf8'))
+    )
+  }
+  const lock = source
   const packages = lock.packages
   const rootPackage = packages['']
   const pending = Object.keys(rootPackage.dependencies ?? {}).map((name) => `node_modules/${name}`)

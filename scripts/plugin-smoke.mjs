@@ -23,7 +23,6 @@ import { parseMcpPageList } from '../dist/existing-flow.js'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const withBrowser = process.argv.includes('--browser')
 const work = mkdtempSync(join(tmpdir(), 'browser-plugin-smoke-'))
-const json = (path) => JSON.parse(readFileSync(path, 'utf8'))
 
 function command(name, args, cwd = root) {
   const result = spawnSync(name, args, { cwd, encoding: 'utf8' })
@@ -31,9 +30,47 @@ function command(name, args, cwd = root) {
   return result.stdout
 }
 
+function parseLockText(text) {
+  return JSON.parse(
+    text
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('//'))
+      .map((line) => line.replace(/\s\/\/.*$/, ''))
+      .join('\n')
+      .replace(/,(\s*[}\]])/g, '$1')
+  )
+}
+
+function productionPackageNames(lock) {
+  const packages = lock.packages ?? {}
+  const workspaceRoot = lock.workspaces?.[''] ?? {}
+  const names = new Set()
+  const pending = Object.keys(workspaceRoot.dependencies ?? {})
+  while (pending.length) {
+    const name = pending.pop()
+    if (!name || names.has(name)) continue
+    const key = Object.keys(packages).find((k) => k === name || k.startsWith(`${name}@`))
+    if (!key) continue
+    names.add(name)
+    const meta = Array.isArray(packages[key]) ? (packages[key][2] ?? {}) : {}
+    for (const dep of Object.keys(meta.dependencies ?? {})) pending.push(dep)
+    for (const dep of Object.keys(meta.optionalDependencies ?? {})) pending.push(dep)
+    for (const dep of Object.keys(meta.peerDependencies ?? {})) {
+      if (meta.peerDependenciesMeta?.[dep]?.optional !== true) pending.push(dep)
+    }
+  }
+  return names
+}
+
 function productionPaths(lock) {
-  const pending = Object.keys(lock.packages[''].dependencies).map((name) => `node_modules/${name}`)
   const paths = new Set()
+  if (lock.lockfileVersion !== undefined) {
+    for (const name of productionPackageNames(lock)) {
+      paths.add(`node_modules/${name}`)
+    }
+    return paths
+  }
+  const pending = Object.keys(lock.packages[''].dependencies).map((name) => `node_modules/${name}`)
   while (pending.length) {
     const path = pending.pop()
     if (paths.has(path)) continue
@@ -82,7 +119,11 @@ function stagePackage() {
     assert.ok(names.includes(path), path)
   assert.equal(names.filter((path) => path.endsWith('/SKILL.md')).length, 8)
   assert.ok(!names.some((path) => /\.map$|^test\/|^node_modules\/|^\.github\//.test(path)))
-  for (const path of productionPaths(json(join(root, 'package-lock.json')))) {
+  const lockPath = existsSync(join(root, 'bun.lock'))
+    ? join(root, 'bun.lock')
+    : join(root, 'package-lock.json')
+  const lock = parseLockText(readFileSync(lockPath, 'utf8'))
+  for (const path of productionPaths(lock)) {
     // Optional packages for a different OS may be absent; npm behaves the same way.
     if (!existsSync(join(root, path))) continue
     mkdirSync(dirname(join(stage, path)), { recursive: true })
