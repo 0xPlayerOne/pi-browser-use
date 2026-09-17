@@ -50,7 +50,7 @@
     "prebuild": "tsc -b --clean tsconfig.json",
     "format:check": "oxfmt --check .",
     "fmt": "oxfmt .",
-    "lint": "oxlint",
+    "lint": "oxlint --deny-warnings",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "npm run build",
     "bench": "node scripts/bench.mjs",
@@ -73,8 +73,8 @@
   "devDependencies": {
     "@earendil-works/pi-ai": "0.85.1",
     "@types/node": "^22.0.0",
-    "oxfmt": "^0.66.0",
-    "oxlint": "^1.81.0",
+    "oxfmt": "^0.68.0",
+    "oxlint": "^1.83.0",
     "typescript": "^6.0.3"
   },
   "peerDependencies": {
