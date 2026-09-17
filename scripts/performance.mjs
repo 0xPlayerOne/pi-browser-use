@@ -116,12 +116,17 @@ function productionPackageNames(lock) {
   return names
 }
 
-export function countProductionDependencies(repoRoot) {
-  const bunLockPath = resolve(repoRoot, 'bun.lock')
-  if (existsSync(bunLockPath)) {
-    return productionPackageNames(parseLockText(readFileSync(bunLockPath, 'utf8'))).size
+export function countProductionDependencies(source) {
+  if (typeof source === 'string') {
+    const bunLockPath = resolve(source, 'bun.lock')
+    if (existsSync(bunLockPath)) {
+      return productionPackageNames(parseLockText(readFileSync(bunLockPath, 'utf8'))).size
+    }
+    return countProductionDependencies(
+      JSON.parse(readFileSync(resolve(source, 'package-lock.json'), 'utf8'))
+    )
   }
-  const lock = JSON.parse(readFileSync(resolve(repoRoot, 'package-lock.json'), 'utf8'))
+  const lock = source
   const packages = lock.packages
   const rootPackage = packages['']
   const pending = Object.keys(rootPackage.dependencies ?? {}).map((name) => `node_modules/${name}`)
