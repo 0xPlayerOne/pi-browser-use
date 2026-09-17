@@ -53,7 +53,7 @@ function productionPackageNames(lock) {
     const key = Object.keys(packages).find((k) => k === name || k.startsWith(`${name}@`))
     if (!key) continue
     names.add(name)
-    const meta = Array.isArray(packages[key]) ? packages[key][2] ?? {} : {}
+    const meta = Array.isArray(packages[key]) ? (packages[key][2] ?? {}) : {}
     for (const dep of Object.keys(meta.dependencies ?? {})) pending.push(dep)
     for (const dep of Object.keys(meta.optionalDependencies ?? {})) pending.push(dep)
     for (const [dep, range] of Object.entries(meta.peerDependencies ?? {})) {

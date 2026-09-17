@@ -618,9 +618,7 @@ function dependencyHash() {
     ? resolve(ROOT, 'bun.lock')
     : resolve(ROOT, 'package-lock.json')
   try {
-    return createHash('sha256')
-      .update(readFileSync(lockPath))
-      .digest('hex')
+    return createHash('sha256').update(readFileSync(lockPath)).digest('hex')
   } catch {
     return 'unknown'
   }
