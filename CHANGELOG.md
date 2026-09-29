@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.9](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.8...pi-browser-use-v0.11.9) (2026-09-29)
+
+
+### Maintenance
+
+* align toolchain with fleet standard and adopt runtime v1.30.0 ([#68](https://github.com/0xPlayerOne/pi-browser-use/issues/68)) ([34bb1af](https://github.com/0xPlayerOne/pi-browser-use/commit/34bb1afd2b74b1c4188943c3bcc71d0a71bba40f))
+* **code-foundry:** upgrade runtime to v1.35.0 ([#72](https://github.com/0xPlayerOne/pi-browser-use/issues/72)) ([032b360](https://github.com/0xPlayerOne/pi-browser-use/commit/032b360fcf018bded2f7ab084618a2655eaa5dd7))
+
 ## [0.11.8](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.7...pi-browser-use-v0.11.8) (2026-09-17)
 
 
