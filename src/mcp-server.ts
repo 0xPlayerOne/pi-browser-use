@@ -148,6 +148,8 @@ export function createBrowserMcpServer(
         name: tool.name,
         description: tool.description,
         inputSchema: tool.parameters as Tool['inputSchema'],
+        // Standards-compliant hosts gate tools on these hints; omit when unknown.
+        ...(tool.annotations ? { annotations: tool.annotations } : {}),
       })),
     }
   })

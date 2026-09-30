@@ -55,11 +55,18 @@ type CompleteFn = (
 
 interface ModelRegistry {
   find(provider: string, modelId: string): unknown
-  getApiKeyAndHeaders(
-    model: unknown
-  ): Promise<
-    { ok: true; apiKey?: string; headers?: Record<string, string> } | { ok: false; error: string }
+  getApiKeyAndHeaders(model: unknown): Promise<
+    // Host registries widen header values to allow null; see toRequestHeaders.
+    | { ok: true; apiKey?: string; headers?: Record<string, string | null> }
+    | { ok: false; error: string }
   >
+}
+
+/** Drops null-valued headers, which are not valid to send on a request. */
+function toRequestHeaders(headers: Record<string, string | null>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(headers).filter((entry): entry is [string, string] => entry[1] !== null)
+  )
 }
 
 async function loadComplete(): Promise<CompleteFn> {
@@ -92,7 +99,10 @@ export function createRegistryVisionCaller(
     }
     const options: Record<string, unknown> = { maxTokens: 2048 }
     if (auth.apiKey) options.apiKey = auth.apiKey
-    if (auth.headers) options.headers = auth.headers
+    if (auth.headers) {
+      const headers = toRequestHeaders(auth.headers)
+      if (Object.keys(headers).length > 0) options.headers = headers
+    }
     if (signal) options.signal = signal
     const complete = await loadComplete()
     const result = await complete(

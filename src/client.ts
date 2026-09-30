@@ -10,6 +10,26 @@ const MCP_STDERR_LIMIT = 4_096
 const MCP_SYSTEM_ERROR_CODE_PATTERN =
   /^(?:EACCES|EADDRINUSE|ECONNREFUSED|ECONNRESET|EHOSTUNREACH|ENOENT|ENOTEMPTY|ENOTFOUND|EPERM|ETIMEDOUT)$/
 
+/**
+ * MCP tool annotations as declared upstream. The shape matches both the
+ * `@modelcontextprotocol/sdk` `Tool.annotations` object and Pi's
+ * `ToolAnnotations`, so the same value serves every host adapter.
+ */
+export interface ToolAnnotations {
+  readOnlyHint?: boolean
+  destructiveHint?: boolean
+  idempotentHint?: boolean
+  openWorldHint?: boolean
+}
+
+/** An upstream tool as advertised over MCP, kept host-independent. */
+export interface UpstreamTool {
+  name: string
+  description?: string
+  inputSchema: unknown
+  annotations?: ToolAnnotations
+}
+
 const require = createRequire(import.meta.url)
 const chromeDevToolsMcpPackagePath = require.resolve('chrome-devtools-mcp/package.json')
 // oxlint-disable-next-line no-unsafe-read -- package.json of a pinned dependency
@@ -187,13 +207,11 @@ export class DevToolsClient {
     await this.connect(signal)
   }
 
-  async listAllTools(
-    signal?: AbortSignal
-  ): Promise<Array<{ name: string; description?: string; inputSchema: unknown }>> {
+  async listAllTools(signal?: AbortSignal): Promise<UpstreamTool[]> {
     await this.ensureReady(signal)
     const client = this.client
     if (!client) throw new Error('Client not connected')
-    const allTools: Array<{ name: string; description?: string; inputSchema: unknown }> = []
+    const allTools: UpstreamTool[] = []
     let cursor: string | undefined
     do {
       const result = await client.listTools(cursor ? { cursor } : undefined, {
@@ -205,6 +223,9 @@ export class DevToolsClient {
           name: t.name,
           description: t.description,
           inputSchema: t.inputSchema,
+          // Upstream annotations drive host permission gates, so carry them
+          // through instead of dropping them at the adapter boundary.
+          annotations: t.annotations as ToolAnnotations | undefined,
         }))
       )
       cursor = result.nextCursor
