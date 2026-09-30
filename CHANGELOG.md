@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.0...pi-browser-use-v0.12.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* **pkg:** declare a Node engine range instead of an exact pin ([#80](https://github.com/0xPlayerOne/pi-browser-use/issues/80)) ([c025ec4](https://github.com/0xPlayerOne/pi-browser-use/commit/c025ec4f99bef8fb4b53f411526caf6d0d2ddd50))
+
 ## [0.12.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.12...pi-browser-use-v0.12.0) (2026-09-30)
 
 
