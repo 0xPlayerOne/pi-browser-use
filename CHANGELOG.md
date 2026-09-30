@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.11.11](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.10...pi-browser-use-v0.11.11) (2026-09-30)
+
+
+### Maintenance
+
+* **ci:** switch Dependabot to bun ecosystem for bun.lock repo ([#71](https://github.com/0xPlayerOne/pi-browser-use/issues/71)) ([d814e2b](https://github.com/0xPlayerOne/pi-browser-use/commit/d814e2b9581e0b5feb68708401a5c112992dcfd5))
+
+## [0.11.10](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.9...pi-browser-use-v0.11.10) (2026-09-29)
+
+
+### Maintenance
+
+* **code-foundry:** upgrade runtime to v1.36.4 ([#73](https://github.com/0xPlayerOne/pi-browser-use/issues/73)) ([5ce7034](https://github.com/0xPlayerOne/pi-browser-use/commit/5ce7034d5bc32dc26022244844d3e3776770f108))
+
 ## [0.11.9](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.8...pi-browser-use-v0.11.9) (2026-09-29)
 
 
