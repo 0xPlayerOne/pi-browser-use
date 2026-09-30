@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.8](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.7...pi-browser-use-v0.12.8) (2026-09-30)
+
+
+### Tests
+
+* remove wall-clock races from the Chrome readiness tests ([#93](https://github.com/0xPlayerOne/pi-browser-use/issues/93)) ([2d719af](https://github.com/0xPlayerOne/pi-browser-use/commit/2d719afe94f615fb518452fc0c37f9f36f419ea7))
+
 ## [0.12.7](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.6...pi-browser-use-v0.12.7) (2026-09-30)
 
 
