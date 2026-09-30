@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.12](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.11...pi-browser-use-v0.11.12) (2026-09-30)
+
+
+### Maintenance
+
+* **deps:** bump actions/setup-node ([#61](https://github.com/0xPlayerOne/pi-browser-use/issues/61)) ([879bbe7](https://github.com/0xPlayerOne/pi-browser-use/commit/879bbe73551fda9c0f02e2b5f903a033d2869169))
+
 ## [0.11.11](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.10...pi-browser-use-v0.11.11) (2026-09-30)
 
 
