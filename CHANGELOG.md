@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.12...pi-browser-use-v0.12.0) (2026-09-30)
+
+
+### Features
+
+* align to Pi 0.99 and propagate MCP tool annotations ([#77](https://github.com/0xPlayerOne/pi-browser-use/issues/77)) ([93b3443](https://github.com/0xPlayerOne/pi-browser-use/commit/93b34430efae8bd1c29ac2623d3f2d75d323f06a))
+
 ## [0.11.12](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.11.11...pi-browser-use-v0.11.12) (2026-09-30)
 
 
