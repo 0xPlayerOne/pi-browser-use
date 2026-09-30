@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.4](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.3...pi-browser-use-v0.12.4) (2026-09-30)
+
+
+### CI
+
+* also run the browser smoke when a pull request opens ready ([#86](https://github.com/0xPlayerOne/pi-browser-use/issues/86)) ([1a6e916](https://github.com/0xPlayerOne/pi-browser-use/commit/1a6e9168a90ada97c1dba7e29997ff774fb53f11))
+
 ## [0.12.3](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.2...pi-browser-use-v0.12.3) (2026-09-30)
 
 
