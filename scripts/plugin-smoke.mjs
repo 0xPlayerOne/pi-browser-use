@@ -48,11 +48,29 @@ function parseLockText(text) {
   )
 }
 
+/**
+ * Runtime packages a portable consumer installs: the published dependencies plus
+ * the non-optional peers, because `npm install`, `bun install`, and `pnpm install`
+ * all auto-install peers. Optional peers are supplied by the host and must stay
+ * out of the staged copy, which is what keeps the pi packages unresolvable
+ * below.
+ */
+function rootProductionNames(workspaceRoot) {
+  const names = Object.keys(workspaceRoot.dependencies ?? {})
+  const optionalPeers = workspaceRoot.optionalPeers ?? []
+  for (const name of Object.keys(workspaceRoot.peerDependencies ?? {})) {
+    if (optionalPeers.includes(name)) continue
+    if (workspaceRoot.peerDependenciesMeta?.[name]?.optional === true) continue
+    names.push(name)
+  }
+  return names
+}
+
 function productionPackageNames(lock) {
   const packages = lock.packages ?? {}
   const workspaceRoot = lock.workspaces?.[''] ?? {}
   const names = new Set()
-  const pending = Object.keys(workspaceRoot.dependencies ?? {})
+  const pending = rootProductionNames(workspaceRoot)
   while (pending.length) {
     const name = pending.pop()
     if (!name || names.has(name)) continue
