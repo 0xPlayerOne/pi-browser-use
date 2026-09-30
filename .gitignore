@@ -17,6 +17,9 @@ node_modules/
 .turbo/
 *.tsbuildinfo
 next-env.d.ts
+# This repository installs with bun; bun.lock is the committed lockfile. An
+# npm lockfile is a local byproduct and must never reach a commit.
+package-lock.json
 
 # Python
 .venv/

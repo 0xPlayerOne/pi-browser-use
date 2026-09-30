@@ -316,14 +316,12 @@ describe('chrome launch readiness', { skip: process.platform === 'win32' }, () =
     writeFileSync(
       server,
       `import { createServer } from 'node:http'
-import { readFileSync, writeFileSync } from 'node:fs'
 const portArg = process.argv.find((a) => a.startsWith('--remote-debugging-port=')) ?? ''
 const port = Number(portArg.split('=')[1])
-let runs = 0
-try { runs = Number(readFileSync(${JSON.stringify(counter)}, 'utf8')) } catch {}
-runs += 1
-writeFileSync(${JSON.stringify(counter)}, String(runs))
-if (runs === 1) {
+// The run number is decided by the shell wrapper, never here: this branch must
+// not depend on how long this process took to start, or a slow first attempt
+// gets killed before it records anything and the retry repeats the failure.
+if (Number(process.env.FAKE_CHROME_RUN) === 1) {
   setTimeout(() => process.exit(0), 60_000)
 } else {
   createServer((_req, res) => {
@@ -335,21 +333,37 @@ if (runs === 1) {
 `
     )
     const fake = join(dir, 'fake-chrome')
-    writeFileSync(fake, `#!/bin/sh\nexec "\${FAKE_CHROME_NODE:-node}" '${server}' "$@"\n`, {
-      mode: 0o755,
-    })
+    writeFileSync(
+      fake,
+      `#!/bin/sh
+runs=0
+[ -f '${counter}' ] && runs=$(cat '${counter}')
+runs=$((runs + 1))
+printf '%s' "$runs" > '${counter}'
+FAKE_CHROME_RUN="$runs"; export FAKE_CHROME_RUN
+exec "\${FAKE_CHROME_NODE:-node}" '${server}' "$@"
+`,
+      { mode: 0o755 }
+    )
     chmodSync(fake, 0o755)
     process.env.FAKE_CHROME_NODE = process.execPath
     t.after(() => delete process.env.FAKE_CHROME_NODE)
+    const started = Date.now()
     const chrome = await launchChrome({
       userDataDir: join(dir, 'profile'),
       executablePath: fake,
-      readyTimeoutMs: 500,
+      // Attempt 1 must time out, which is the point of the test. Attempt 2 has
+      // to cold-start a Node process and bind a listener inside its own window,
+      // so this needs real headroom over process startup, not a token amount.
+      readyTimeoutMs: 2_000,
       launchAttempts: 2,
     })
     t.after(() => chrome.shutdown())
     assert.equal(readFileSync(counter, 'utf8'), '2')
     assert.match(chrome.browserUrl, /^http:\/\/127\.0\.0\.1:\d+$/)
+    // Two readiness windows elapse, yet the total stays bounded.
+    assert.ok(Date.now() - started >= 2_000, 'both readiness windows must elapse')
+    assert.ok(Date.now() - started < 15_000, 'the retry must not hang')
   })
 
   it('reports exhausted attempts instead of a single-window timeout', async (t) => {

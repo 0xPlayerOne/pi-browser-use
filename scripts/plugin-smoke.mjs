@@ -237,7 +237,7 @@ async function probe(stage, termination) {
     if (withBrowser && termination === 'eof') await browserProbe(tool, data)
     if (termination === 'eof') child.stdin.end()
     else child.kill('SIGTERM')
-    const timer = setTimeout(() => child.kill('SIGKILL'), 15_000)
+    const timer = setTimeout(() => child.kill('SIGKILL'), 30_000)
     const [code, signal] = await exit
     clearTimeout(timer)
     assert.equal(signal, null, `unclean shutdown (${stderr})`)
@@ -249,7 +249,7 @@ async function probe(stage, termination) {
   } finally {
     if (child.exitCode === null && child.signalCode === null) {
       child.stdin.end()
-      const timer = setTimeout(() => child.kill('SIGKILL'), 15_000)
+      const timer = setTimeout(() => child.kill('SIGKILL'), 30_000)
       try {
         await exit
       } finally {

@@ -54,7 +54,10 @@ export interface ChromeProcess {
   readonly exited: boolean
   /** Resolves when the process exits (bootstrap uses this: close → READY). */
   waitForExit(): Promise<number | null>
-  /** SIGTERM, then SIGKILL after `graceMs` if still alive. */
+  /**
+   * Ask Chrome to close over CDP so it flushes profile state, then SIGTERM and
+   * SIGKILL after `graceMs` if it will not go.
+   */
   shutdown(graceMs?: number): Promise<void>
 }
 
@@ -221,17 +224,70 @@ export async function waitForDevToolsEndpoint(
   throw new DevToolsReadyTimeoutError(browserUrl, timeoutMs, lastError)
 }
 
+/**
+ * Ask Chrome to shut down over the DevTools protocol.
+ *
+ * This is what makes a persistent profile actually persistent: Chrome keeps
+ * cookies, local storage and IndexedDB in memory and only commits them on a
+ * clean shutdown (or on its own ~30s timer). A signal is not a clean shutdown,
+ * so terminating the process with SIGTERM/SIGKILL silently discards whatever
+ * the session wrote, and the next launch of the same profile comes back
+ * logged out. `Browser.close` is the command Chrome treats as a real quit.
+ *
+ * Best-effort: a failure here must never block the caller's shutdown, which
+ * still has the signal path as a fallback.
+ */
+async function closeBrowserOverCdp(
+  webSocketDebuggerUrl: string,
+  timeoutMs: number
+): Promise<boolean> {
+  if (!webSocketDebuggerUrl) return false
+  return new Promise<boolean>((resolve) => {
+    let settled = false
+    const finish = (result: boolean) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      try {
+        socket.close()
+      } catch {
+        // Already closing; nothing to salvage.
+      }
+      resolve(result)
+    }
+    const socket = new WebSocket(webSocketDebuggerUrl)
+    const timer = setTimeout(() => finish(false), timeoutMs)
+    socket.addEventListener('open', () => {
+      try {
+        socket.send(JSON.stringify({ id: 1, method: 'Browser.close' }))
+      } catch {
+        finish(false)
+      }
+    })
+    // Chrome answers Browser.close, then exits; either is proof it took the
+    // graceful path. A hang or refusal falls through to the signal path.
+    socket.addEventListener('message', () => finish(true))
+    socket.addEventListener('error', () => finish(false))
+    socket.addEventListener('close', () => finish(true))
+  })
+}
+
 class OwnedChromeProcess implements ChromeProcess {
   private readonly child: ChildProcess
   private readonly exitPromise: Promise<number | null>
   private exitedFlag = false
+  private readonly webSocketDebuggerUrl: string
 
   constructor(
     child: ChildProcess,
     readonly port: number,
     readonly browserUrl: string,
-    readonly userDataDir: string
+    readonly userDataDir: string,
+    // Absent for callers that never opened a DevTools endpoint (the bootstrap
+    // path); those fall straight through to the signal-based shutdown.
+    webSocketDebuggerUrl = ''
   ) {
+    this.webSocketDebuggerUrl = webSocketDebuggerUrl
     this.child = child
     this.exitPromise = new Promise((resolve) => {
       child.on('exit', (code) => {
@@ -255,23 +311,56 @@ class OwnedChromeProcess implements ChromeProcess {
 
   async shutdown(graceMs = 10_000): Promise<void> {
     if (this.exited) return
+    // The signal path could always burn up to two grace windows, so the whole
+    // shutdown keeps that same ceiling. The graceful attempt is paid for out
+    // of it rather than added on top, which would regress shutdown latency for
+    // every caller.
+    const deadline = Date.now() + graceMs * 2
+    const remaining = () => Math.max(0, deadline - Date.now())
+    const waitForExit = async () => {
+      const budget = remaining()
+      if (budget <= 0) return false
+      return Promise.race([
+        this.exitPromise.then(() => true),
+        new Promise<false>((resolve) => setTimeout(() => resolve(false), budget)),
+      ])
+    }
+    // Ask Chrome to quit properly so profile state reaches disk. It flushes on
+    // receiving the command and normally exits within a second or two; the
+    // bounded windows below keep the whole shutdown inside the same ceiling the
+    // signal path already had.
+    const askedGracefully = await closeBrowserOverCdp(
+      this.webSocketDebuggerUrl,
+      Math.min(1_000, remaining())
+    )
+    if (askedGracefully && ((await this.waitForExitGracefully()) || this.exited)) return
     this.child.kill('SIGTERM')
-    const exited = await Promise.race([
-      this.exitPromise.then(() => true),
-      new Promise<false>((resolve) => setTimeout(() => resolve(false), graceMs)),
-    ])
+    const exited = await waitForExit()
     if (!exited && !this.exited) {
       this.child.kill('SIGKILL')
-      const killed = await Promise.race([
-        this.exitPromise.then(() => true),
-        new Promise<false>((resolve) => setTimeout(() => resolve(false), graceMs)),
-      ])
+      const killed = await waitForExit()
       if (!killed) {
         throw new Error(
           `Chrome pid ${this.child.pid} refused to die (SIGTERM+SIGKILL); refusing to report a clean shutdown.`
         )
       }
     }
+  }
+
+  /**
+   * Wait for Chrome to finish the quit it was asked for over CDP. Chrome flushes
+   * profile state the moment it receives `Browser.close`; the rest is Chrome
+   * tearing itself down, which is slower the more it has written and when a
+   * second instance contends for the same profile. Under five seconds the common
+   * case is well under two, and anything slower falls through to the signal
+   * ladder, which still works.
+   */
+  private async waitForExitGracefully(): Promise<boolean> {
+    if (this.exited) return true
+    return Promise.race([
+      this.exitPromise.then(() => true),
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), 5_000)),
+    ])
   }
 }
 
@@ -285,13 +374,13 @@ async function waitReadyWatchingExit(
   port: number,
   timeoutMs: number | undefined,
   signal: AbortSignal | undefined
-): Promise<void> {
+): Promise<string> {
   const endpointReady = waitForDevToolsEndpoint(port, { timeoutMs, signal })
   const exited = once(child, 'exit')
   // Losing the race must not surface later as an unhandled rejection.
   exited.catch(() => {})
   try {
-    await Promise.race([
+    const ready = await Promise.race([
       endpointReady,
       exited.then(([code, exitSignal]) => {
         const reason = code !== null ? `code ${code}` : `signal ${exitSignal ?? 'unknown'}`
@@ -300,6 +389,7 @@ async function waitReadyWatchingExit(
         )
       }),
     ])
+    return ready.webSocketDebuggerUrl
   } catch (error) {
     endpointReady.catch(() => {})
     throw error
@@ -335,8 +425,19 @@ export async function launchChrome(options: ChromeLaunchOptions): Promise<Chrome
       throw new Error(`Chrome exited immediately (code ${child.exitCode}).`)
     }
     try {
-      await waitReadyWatchingExit(child, port, options.readyTimeoutMs, options.signal)
-      return new OwnedChromeProcess(child, port, `http://127.0.0.1:${port}`, options.userDataDir)
+      const webSocketDebuggerUrl = await waitReadyWatchingExit(
+        child,
+        port,
+        options.readyTimeoutMs,
+        options.signal
+      )
+      return new OwnedChromeProcess(
+        child,
+        port,
+        `http://127.0.0.1:${port}`,
+        options.userDataDir,
+        webSocketDebuggerUrl
+      )
     } catch (error) {
       try {
         child.kill('SIGKILL')
