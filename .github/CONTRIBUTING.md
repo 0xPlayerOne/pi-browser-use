@@ -1,4 +1,5 @@
 # Contributing
+
 <!-- code-foundry-managed: config-aware-policy -->
 
 This guide is the operating contract for humans and automation contributing to this repository.
@@ -36,6 +37,7 @@ Agents must not:
 - Claim completion when tests, deployment checks, or required reviews are still pending.
 
 <!-- /code-foundry-managed: agent-operating-contract -->
+
 ### Pull request readiness (mandatory)
 
 This repository uses the `direct` workflow. Topic pull requests target `main`.

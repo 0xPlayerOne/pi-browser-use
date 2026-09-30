@@ -1,4 +1,5 @@
 # Agent Instructions
+
 <!-- code-foundry-managed: config-aware-policy -->
 
 These instructions are the repository-level operating contract for coding agents, including Hermes, OpenCode, and other automation.
@@ -131,6 +132,7 @@ them:
   required checks pass.
 
 <!-- /code-foundry-managed: git-workflow-and-merging -->
+
 ## Code Foundry workflow policy (mandatory)
 
 This repository uses the `direct` workflow. Topic pull requests target `main`.
