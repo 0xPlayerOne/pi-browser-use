@@ -22,6 +22,12 @@ npm install --omit=dev pi-browser-use
 # <absolute-install-directory>/node_modules/pi-browser-use
 ```
 
+`typebox` is a peer dependency, so let the package manager install peers (the npm,
+Bun, and pnpm default). Only a peer-skipping install such as
+`npm install --legacy-peer-deps` omits it, and the portable server then needs an
+explicit `npm install typebox`. Pi's managed install skips peers on purpose: the
+extension loader resolves `typebox` to Pi's own copy.
+
 To test an unpublished branch, use `npm ci && npm run build` in the checkout and
 load that directory. The manifest starts `node ${PLUGIN_ROOT}/dist/mcp-server.js`;
 there is no install-time shell hook, network package download, or hidden Pi dependency

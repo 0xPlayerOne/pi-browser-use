@@ -95,11 +95,28 @@ function parseLockText(text) {
   )
 }
 
+/**
+ * Non-optional peers count as production packages: `npm install`, `bun install`,
+ * and `pnpm install` all install them for a consumer. Optional peers are supplied
+ * by the host and never shipped. bun.lock marks optional peers in `optionalPeers`;
+ * package-lock.json uses `peerDependenciesMeta`.
+ */
+function rootProductionNames(workspaceRoot) {
+  const names = Object.keys(workspaceRoot.dependencies ?? {})
+  const optionalPeers = workspaceRoot.optionalPeers ?? []
+  for (const name of Object.keys(workspaceRoot.peerDependencies ?? {})) {
+    if (optionalPeers.includes(name)) continue
+    if (workspaceRoot.peerDependenciesMeta?.[name]?.optional === true) continue
+    names.push(name)
+  }
+  return names
+}
+
 function productionPackageNames(lock) {
   const packages = lock.packages ?? {}
   const workspaceRoot = lock.workspaces?.[''] ?? {}
   const names = new Set()
-  const pending = Object.keys(workspaceRoot.dependencies ?? {})
+  const pending = rootProductionNames(workspaceRoot)
   while (pending.length) {
     const name = pending.pop()
     if (!name || names.has(name)) continue
