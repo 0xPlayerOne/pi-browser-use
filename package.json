@@ -1,6 +1,6 @@
 {
   "name": "pi-browser-use",
-  "version": "0.12.5",
+  "version": "0.12.6",
   "description": "Opinionated browser automation via chrome-devtools-mcp: native Pi extension and portable Agent Plugins 1.0 skills + MCP server.",
   "keywords": [
     "automation",
@@ -67,8 +67,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "chrome-devtools-mcp": "1.10.1",
-    "typebox": "*"
+    "chrome-devtools-mcp": "1.10.1"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "0.99.1",
@@ -76,11 +75,13 @@
     "@types/node": "^26.5.1",
     "oxfmt": "^0.68.0",
     "oxlint": "^1.83.0",
+    "typebox": "*",
     "typescript": "^6.0.3"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": ">=0.80.10",
-    "@earendil-works/pi-coding-agent": ">=0.80.10"
+    "@earendil-works/pi-coding-agent": ">=0.80.10",
+    "typebox": "*"
   },
   "peerDependenciesMeta": {
     "@earendil-works/pi-ai": {

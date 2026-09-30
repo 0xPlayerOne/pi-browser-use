@@ -133,6 +133,8 @@ them:
 
 <!-- /code-foundry-managed: git-workflow-and-merging -->
 
+<!-- code-foundry-managed: pull-request-policy -->
+
 ## Code Foundry workflow policy (mandatory)
 
 This repository uses the `direct` workflow. Topic pull requests target `main`.
