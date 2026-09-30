@@ -3,7 +3,10 @@ name: Browser plugin
 on:
   pull_request:
     branches: [main]
-    types: [ready_for_review]
+    # `synchronize` is required because this job is a required status check: a
+    # `ready_for_review`-only trigger would leave the previous run's verdict in
+    # place after a new commit, which is a stale pass.
+    types: [ready_for_review, synchronize]
 
 permissions:
   contents: read
