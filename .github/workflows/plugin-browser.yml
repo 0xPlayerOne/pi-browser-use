@@ -3,10 +3,14 @@ name: Browser plugin
 on:
   pull_request:
     branches: [main]
-    # `synchronize` is required because this job is a required status check: a
-    # `ready_for_review`-only trigger would leave the previous run's verdict in
-    # place after a new commit, which is a stale pass.
-    types: [ready_for_review, synchronize]
+    # This job is a required status check, so it has to report on the head
+    # commit under every way a pull request reaches this point:
+    # - `opened` covers pull requests created ready (Dependabot does this). They
+    #   never fire `ready_for_review`, so without it they would never report and
+    #   the branch would stay blocked forever.
+    # - `ready_for_review` covers the draft -> ready transition.
+    # - `synchronize` stops a later commit from inheriting an earlier verdict.
+    types: [opened, ready_for_review, synchronize]
 
 permissions:
   contents: read
