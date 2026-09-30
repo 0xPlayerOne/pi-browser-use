@@ -215,7 +215,10 @@ describe('chrome launcher helpers', () => {
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
     const port = server.address().port
     try {
-      const info = await waitForDevToolsEndpoint(port, { timeoutMs: 2_000 })
+      // The mock lives in this process, so the only thing the window has to
+      // cover is scheduling: the suite runs every test file in parallel and a
+      // starved event loop can miss a two-second window outright.
+      const info = await waitForDevToolsEndpoint(port, { timeoutMs: 5_000 })
       assert.equal(info.browserUrl, `http://127.0.0.1:${port}`)
     } finally {
       server.close()
@@ -298,72 +301,76 @@ describe('chrome launch readiness', { skip: process.platform === 'win32' }, () =
         launchChrome({
           userDataDir: join(dir, 'profile'),
           executablePath: fake,
-          readyTimeoutMs: 10_000,
+          // The bound below is the assertion, so the window keeps its headroom
+          // over process scheduling: a stalled machine must not turn "exits
+          // early" into "burned the whole window".
+          readyTimeoutMs: 20_000,
           launchAttempts: 1,
         }),
       /Chrome exited \(code 3\) before the DevTools endpoint/
     )
-    assert.ok(Date.now() - started < 9_000, 'must not burn the whole readiness window')
+    assert.ok(Date.now() - started < 18_000, 'must not burn the whole readiness window')
   })
 
   it('retries a slow start and succeeds on the next attempt', async (t) => {
-    const { writeFileSync, chmodSync, readFileSync } = await import('node:fs')
+    const { existsSync, readFileSync, writeFileSync, chmodSync } = await import('node:fs')
+    const { createServer } = await import('node:http')
     const { launchChrome } = await import('../dist/chrome-launcher.js')
     const dir = mkdtempSync(join(tmpdir(), 'chrome-ready-retry-'))
     t.after(() => rmSync(dir, { recursive: true, force: true }))
     const counter = join(dir, 'attempts')
-    const server = join(dir, 'fake-chrome.mjs')
-    writeFileSync(
-      server,
-      `import { createServer } from 'node:http'
-const portArg = process.argv.find((a) => a.startsWith('--remote-debugging-port=')) ?? ''
-const port = Number(portArg.split('=')[1])
-// The run number is decided by the shell wrapper, never here: this branch must
-// not depend on how long this process took to start, or a slow first attempt
-// gets killed before it records anything and the retry repeats the failure.
-if (Number(process.env.FAKE_CHROME_RUN) === 1) {
-  setTimeout(() => process.exit(0), 60_000)
-} else {
-  createServer((_req, res) => {
-    res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(JSON.stringify({ webSocketDebuggerUrl: \`ws://127.0.0.1:\${port}/devtools/browser\` }))
-  }).listen(port, '127.0.0.1')
-  setInterval(() => {}, 60_000)
-}
-`
-    )
+    const runs = () => {
+      if (!existsSync(counter)) return 0
+      return Number(readFileSync(counter, 'utf8')) || 0
+    }
+    // One responder owns the debug port across both attempts and refuses until
+    // the launcher has spawned twice: attempt 1 then burns its readiness window
+    // on 500s and attempt 2 succeeds on the first poll. Spawning a second
+    // listener per attempt instead would put a cold Node start inside the
+    // window, which is how this test used to fail about one run in four on a
+    // loaded machine.
+    const port = await allocateEphemeralPort()
+    const responder = createServer((_request, response) => {
+      const ready = runs() >= 2
+      response.writeHead(ready ? 200 : 500, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ webSocketDebuggerUrl: '' }))
+    })
+    await new Promise((done) => responder.listen(port, '127.0.0.1', done))
+    t.after(() => {
+      responder.closeAllConnections()
+      responder.close()
+    })
+    // The fakes must not bind the port the responder already owns; they only
+    // have to stay alive so the launcher, not an exit event, ends attempt 1.
     const fake = join(dir, 'fake-chrome')
     writeFileSync(
       fake,
       `#!/bin/sh
-runs=0
-[ -f '${counter}' ] && runs=$(cat '${counter}')
+runs=$(cat '${counter}' 2>/dev/null || printf '0')
 runs=$((runs + 1))
-printf '%s' "$runs" > '${counter}'
-FAKE_CHROME_RUN="$runs"; export FAKE_CHROME_RUN
-exec "\${FAKE_CHROME_NODE:-node}" '${server}' "$@"
+printf '%s' "$runs" > '${counter}.tmp' && mv '${counter}.tmp' '${counter}'
+exec sleep 60
 `,
       { mode: 0o755 }
     )
     chmodSync(fake, 0o755)
-    process.env.FAKE_CHROME_NODE = process.execPath
-    t.after(() => delete process.env.FAKE_CHROME_NODE)
     const started = Date.now()
     const chrome = await launchChrome({
       userDataDir: join(dir, 'profile'),
       executablePath: fake,
-      // Attempt 1 must time out, which is the point of the test. Attempt 2 has
-      // to cold-start a Node process and bind a listener inside its own window,
-      // so this needs real headroom over process startup, not a token amount.
+      port,
+      // Attempt 1 must time out, which is the point of the test. Attempt 2 only
+      // has to outlast one poll of the already-warm responder.
       readyTimeoutMs: 2_000,
       launchAttempts: 2,
     })
     t.after(() => chrome.shutdown())
-    assert.equal(readFileSync(counter, 'utf8'), '2')
-    assert.match(chrome.browserUrl, /^http:\/\/127\.0\.0\.1:\d+$/)
-    // Two readiness windows elapse, yet the total stays bounded.
-    assert.ok(Date.now() - started >= 2_000, 'both readiness windows must elapse')
-    assert.ok(Date.now() - started < 15_000, 'the retry must not hang')
+    assert.equal(runs(), 2)
+    assert.match(chrome.browserUrl, new RegExp(`^http://127\\.0\\.0\\.1:${port}$`))
+    // Attempt 1 spends its whole window; the retry answers almost immediately.
+    const elapsed = Date.now() - started
+    assert.ok(elapsed >= 2_000, 'the first readiness window must elapse')
+    assert.ok(elapsed < 10_000, `the retry must not hang (took ${elapsed}ms)`)
   })
 
   it('reports exhausted attempts instead of a single-window timeout', async (t) => {
@@ -414,10 +421,15 @@ it(
     })
     const rejected = assert.rejects(pending, /setup cancelled/)
     t.after(() => controller.abort(new Error('setup cancelled')))
-    for (let attempt = 0; !existsSync(pidFile) && attempt < 100; attempt++)
+    // Existence is not content: the shell creates the pid file a moment before
+    // it writes, so reading on existence alone can yield '' and Number('') is
+    // pid 0, which signals this whole process group.
+    for (let attempt = 0; attempt < 100; attempt++) {
+      if (existsSync(pidFile) && readFileSync(pidFile, 'utf8').length > 0) break
       await new Promise((done) => setTimeout(done, 10))
-    assert.ok(existsSync(pidFile))
+    }
     const pid = Number(readFileSync(pidFile, 'utf8'))
+    assert.ok(pid > 0, 'the fake browser must record its own pid before the kill')
     controller.abort(new Error('setup cancelled'))
     await rejected
     assert.throws(
