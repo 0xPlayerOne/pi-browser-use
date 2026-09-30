@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.6](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.5...pi-browser-use-v0.12.6) (2026-09-30)
+
+
+### Bug Fixes
+
+* declare typebox as a peer dependency ([#92](https://github.com/0xPlayerOne/pi-browser-use/issues/92)) ([7e7bb81](https://github.com/0xPlayerOne/pi-browser-use/commit/7e7bb81b717173112c8e96e51086a925568c0a86)), closes [#83](https://github.com/0xPlayerOne/pi-browser-use/issues/83)
+
 ## [0.12.5](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.4...pi-browser-use-v0.12.5) (2026-09-30)
 
 
