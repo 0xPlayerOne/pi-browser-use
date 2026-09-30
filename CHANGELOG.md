@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.2](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.1...pi-browser-use-v0.12.2) (2026-09-30)
+
+
+### Bug Fixes
+
+* **ci:** install with bun; make Chrome shutdown preserve profile state ([#79](https://github.com/0xPlayerOne/pi-browser-use/issues/79)) ([784d81d](https://github.com/0xPlayerOne/pi-browser-use/commit/784d81d4c9c1c29d0dd850b6a5cb375fb5bcac2f))
+
 ## [0.12.1](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.0...pi-browser-use-v0.12.1) (2026-09-30)
 
 
