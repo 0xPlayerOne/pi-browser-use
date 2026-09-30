@@ -38,6 +38,8 @@ Agents must not:
 
 <!-- /code-foundry-managed: agent-operating-contract -->
 
+<!-- code-foundry-managed: pull-request-policy -->
+
 ### Pull request readiness (mandatory)
 
 This repository uses the `direct` workflow. Topic pull requests target `main`.
