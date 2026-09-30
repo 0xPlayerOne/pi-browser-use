@@ -20,6 +20,7 @@ async function connect(t, execute) {
     name: 'browser_fixture',
     label: 'browser_fixture',
     description: 'test fixture',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     parameters: {
       type: 'object',
       properties: { pageId: { type: 'integer' } },
@@ -117,10 +118,38 @@ it('MCP boundary preserves raw schemas and text/image results through an indepen
   const listed = await f.client.listTools()
   assert.equal(listed.tools.length, 1)
   assert.deepEqual(listed.tools[0].inputSchema, f.definition.parameters)
+  // Annotations reach portable MCP hosts so their permission gates work.
+  assert.deepEqual(listed.tools[0].annotations, { readOnlyHint: true, openWorldHint: true })
   const returned = await f.client.callTool({ name: 'browser_fixture', arguments: { pageId: 7 } })
   assert.deepEqual(returned, result)
   assert.deepEqual(f.calls[0].args, { pageId: 7 })
   assert.ok(f.calls[0].signal instanceof AbortSignal)
+})
+
+it('omits annotations for tools whose behavior is unknown', async (t) => {
+  const runtime = {
+    start: async () => [
+      {
+        name: 'browser_unknown',
+        label: 'browser_unknown',
+        description: 'no declared hints',
+        parameters: { type: 'object', properties: {} },
+        execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      },
+    ],
+    stop: async () => {},
+  }
+  const app = createBrowserMcpServer({ runtime })
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair()
+  const client = new Client({ name: 'independent-client', version: '1.0.0' })
+  await app.server.connect(serverSide)
+  await client.connect(clientSide)
+  t.after(async () => {
+    await client.close()
+    await app.close()
+  })
+  const listed = await client.listTools()
+  assert.equal(listed.tools[0].annotations, undefined)
 })
 
 it('MCP boundary rejects malformed arguments and unknown tools before execution', async (t) => {

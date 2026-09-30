@@ -23,6 +23,13 @@ import { parseMcpPageList } from '../dist/existing-flow.js'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const withBrowser = process.argv.includes('--browser')
 const work = mkdtempSync(join(tmpdir(), 'browser-plugin-smoke-'))
+/**
+ * Tools the packed plugin advertises: the plugin's own plus chrome-devtools-mcp's
+ * less the excluded set. Bump deliberately when a pinned upstream release adds
+ * or removes a tool, so the count is reviewed rather than discovered in CI.
+ */
+const EXPECTED_TOOL_COUNT = 34
+let probedToolCount = 0
 
 function command(name, args, cwd = root) {
   const result = spawnSync(name, args, { cwd, encoding: 'utf8' })
@@ -210,7 +217,8 @@ async function probe(stage, termination) {
     })
     child.stdin.write('{"jsonrpc":"2.0","method":"notifications/initialized"}\n')
     const { tools } = await request('tools/list')
-    assert.equal(tools.length, 33)
+    probedToolCount = tools.length
+    assert.equal(tools.length, EXPECTED_TOOL_COUNT)
     assert.ok(tools.every((entry) => entry.name.startsWith('browser_')))
     assert.ok(
       !tools.some((entry) =>
@@ -320,7 +328,7 @@ try {
   await probe(stage, 'eof')
   await probe(stage, 'sigterm')
   console.log(
-    `PASS: packed production-only plugin, 33 schemas/tools, status, EOF and SIGTERM${withBrowser ? ', real Chrome navigation/images/artifacts and persistent/fresh identity isolation' : ''}.`
+    `PASS: packed production-only plugin, ${probedToolCount} schemas/tools, status, EOF and SIGTERM${withBrowser ? ', real Chrome navigation/images/artifacts and persistent/fresh identity isolation' : ''}.`
   )
 } finally {
   rmSync(work, { recursive: true, force: true })

@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { Type, type TSchema } from 'typebox'
-import { DevToolsClient } from './client.js'
+import { DevToolsClient, type ToolAnnotations } from './client.js'
 import {
   DEFAULT_PROFILE_DIR,
   resolveConfig,
@@ -111,7 +111,10 @@ export interface BrowserToolDefinition {
   name: string
   label: string
   description: string
-  parameters: unknown
+  /** TypeBox schema; every tool is built with `Type.Object` or `Type.Unsafe`. */
+  parameters: TSchema
+  /** Behavior hints for host permission gates; omitted when unknown. */
+  annotations?: ToolAnnotations
   execute: (
     params: Record<string, unknown>,
     signal?: AbortSignal,
@@ -507,6 +510,9 @@ export function createBrowserRuntime(options: BrowserRuntimeOptions = {}) {
         label: prefixedName,
         description,
         parameters,
+        // Upstream owns these hints; re-declaring them here would drift from
+        // whatever chrome-devtools-mcp reports for each tool.
+        annotations: tool.annotations,
         async execute(params, signal) {
           await ensureConnected(signal)
           const browser = client!
@@ -696,6 +702,8 @@ export function createBrowserRuntime(options: BrowserRuntimeOptions = {}) {
       description:
         'Save a screenshot or the rendered HTML of the current page to disk and return its path. Prefer this over pulling image bytes into context when the capture is evidence (bug reports, visual QA, artifact sharing) rather than something you need to look at right now.',
       parameters: Type.Object(properties),
+      // Writes to a caller-supplied path, so it can overwrite an existing file.
+      annotations: { destructiveHint: true, openWorldHint: false },
       async execute(params, signal) {
         await ensureConnected(signal)
         const browser = client!
@@ -885,6 +893,7 @@ export function createBrowserRuntime(options: BrowserRuntimeOptions = {}) {
       description:
         'Plain-language Managed browser status: profile readiness, execution mode, and what to do next. No page is touched.',
       parameters: Type.Object({}),
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
       async execute() {
         const mode = currentMode
         const profileDir = persistentProfileDir(config ?? {})
@@ -1109,6 +1118,7 @@ export function createBrowserRuntime(options: BrowserRuntimeOptions = {}) {
       description:
         'Diagnose the browser setup: effective mode, whether this session launches its own Chrome, profile health, and upstream tool availability. Run this first when browser tools misbehave. Touches no pages.',
       parameters: Type.Object({}),
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
       async execute(_params, signal) {
         await ensureConnected(signal)
         let peers = 0
@@ -1151,6 +1161,8 @@ export function createBrowserRuntime(options: BrowserRuntimeOptions = {}) {
       description:
         'Analyze the current page visually using a screenshot. Use when you need to identify elements by visual attributes (color, layout, position) not available in the accessibility tree, or when you need precise pixel coordinates for coordinate click tools.',
       parameters: Type.Object(properties),
+      // Reads a capture and a vision call; nothing in the page or profile changes.
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
       async execute(params, signal, ctx) {
         await ensureConnected(signal)
         if (!ctx?.callVision) throw new Error('Visual analysis is not provided by this host.')
