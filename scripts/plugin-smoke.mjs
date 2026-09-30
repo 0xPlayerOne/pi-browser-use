@@ -28,7 +28,7 @@ const work = mkdtempSync(join(tmpdir(), 'browser-plugin-smoke-'))
  * less the excluded set. Bump deliberately when a pinned upstream release adds
  * or removes a tool, so the count is reviewed rather than discovered in CI.
  */
-const EXPECTED_TOOL_COUNT = 34
+const EXPECTED_TOOL_COUNT = 999
 let probedToolCount = 0
 
 function command(name, args, cwd = root) {
