@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.9](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.8...pi-browser-use-v0.12.9) (2026-10-02)
+
+
+### Maintenance
+
+* **code-foundry:** upgrade runtime to v1.40.0 ([#97](https://github.com/0xPlayerOne/pi-browser-use/issues/97)) ([1abea17](https://github.com/0xPlayerOne/pi-browser-use/commit/1abea17569fa11830c93855419fd7026be124b74))
+
 ## [0.12.8](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.7...pi-browser-use-v0.12.8) (2026-09-30)
 
 
