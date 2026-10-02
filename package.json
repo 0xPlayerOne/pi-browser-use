@@ -1,6 +1,6 @@
 {
   "name": "pi-browser-use",
-  "version": "0.12.9",
+  "version": "0.12.10",
   "description": "Opinionated browser automation via chrome-devtools-mcp: native Pi extension and portable Agent Plugins 1.0 skills + MCP server.",
   "keywords": [
     "automation",
