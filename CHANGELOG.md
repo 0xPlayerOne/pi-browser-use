@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.12](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.11...pi-browser-use-v0.12.12) (2026-10-08)
+
+
+### Maintenance
+
+* **deps:** build against pi 1.1.0 ([#104](https://github.com/0xPlayerOne/pi-browser-use/issues/104)) ([f9894ed](https://github.com/0xPlayerOne/pi-browser-use/commit/f9894eddae5b2f3484f50d64162417e00bba9f02))
+
 ## [0.12.11](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.10...pi-browser-use-v0.12.11) (2026-10-03)
 
 
