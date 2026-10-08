@@ -24,7 +24,13 @@ it('native Pi keeps settings/trust, tool signatures, lifecycle and lazy model cr
   writeFileSync(
     join(dir, '.pi', 'agent', 'settings.json'),
     JSON.stringify({
-      'pi-browser-use': { mode: 'fresh', visionModel: { provider: 'fixture', model: 'missing' } },
+      // userDataDir keeps the fresh session's identity store off the real
+      // ~/.pi/browser-profile, which a live agent session may hold.
+      'pi-browser-use': {
+        mode: 'fresh',
+        userDataDir: join(dir, 'identity'),
+        visionModel: { provider: 'fixture', model: 'missing' },
+      },
     })
   )
   // Untrusted project settings must not replace safe user settings with a browser attachment.
@@ -88,7 +94,13 @@ it('native Pi receives tool annotations so host permission gates can act on them
   writeFileSync(
     join(dir, '.pi', 'agent', 'settings.json'),
     JSON.stringify({
-      'pi-browser-use': { mode: 'fresh', visionModel: { provider: 'fixture', model: 'missing' } },
+      // userDataDir keeps the fresh session's identity store off the real
+      // ~/.pi/browser-profile, which a live agent session may hold.
+      'pi-browser-use': {
+        mode: 'fresh',
+        userDataDir: join(dir, 'identity'),
+        visionModel: { provider: 'fixture', model: 'missing' },
+      },
     })
   )
   t.mock.method(DevToolsClient.prototype, 'ensureReady', async () => {})
