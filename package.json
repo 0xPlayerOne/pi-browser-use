@@ -70,10 +70,10 @@
     "chrome-devtools-mcp": "1.10.1"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "1.1.0",
-    "@earendil-works/pi-coding-agent": "1.1.0",
+    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/pi-coding-agent": "1.2.0",
     "@types/node": "^26.5.1",
-    "oxfmt": "^0.68.0",
+    "oxfmt": "^0.73.0",
     "oxlint": "^1.83.0",
     "typebox": "*",
     "typescript": "^6.0.3"
