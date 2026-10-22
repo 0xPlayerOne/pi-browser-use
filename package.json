@@ -51,7 +51,7 @@
     "format:check": "oxfmt --check .",
     "fmt": "oxfmt .",
     "lint": "oxlint --deny-warnings",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "bun check --no-script -p tsconfig.json",
     "prepublishOnly": "npm run build",
     "bench": "node scripts/bench.mjs",
     "eval": "node scripts/eval.mjs",
@@ -94,7 +94,7 @@
   "engines": {
     "node": ">=24.18.0"
   },
-  "packageManager": "bun@1.4.0",
+  "packageManager": "bun@1.4.4",
   "pi": {
     "extensions": [
       "./dist/index.js"
