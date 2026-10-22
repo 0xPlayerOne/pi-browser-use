@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.14](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.13...pi-browser-use-v0.12.14) (2026-10-22)
+
+
+### Maintenance
+
+* bun-1.4.4-cloud ([#110](https://github.com/0xPlayerOne/pi-browser-use/issues/110)) ([2d3f0ba](https://github.com/0xPlayerOne/pi-browser-use/commit/2d3f0bae3f1a9ff90931dc6e5ab6664c5d5f0292))
+
 ## [0.12.13](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.12...pi-browser-use-v0.12.13) (2026-10-08)
 
 
