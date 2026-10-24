@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.15](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.14...pi-browser-use-v0.12.15) (2026-10-24)
+
+
+### Maintenance
+
+* Code Foundry v1.48.8 + Pi 1.4.0 ([#114](https://github.com/0xPlayerOne/pi-browser-use/issues/114)) ([7de94dc](https://github.com/0xPlayerOne/pi-browser-use/commit/7de94dce2628c9aece743864d054adc3df6a5e05))
+
 ## [0.12.14](https://github.com/0xPlayerOne/pi-browser-use/compare/pi-browser-use-v0.12.13...pi-browser-use-v0.12.14) (2026-10-22)
 
 
