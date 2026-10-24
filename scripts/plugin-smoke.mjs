@@ -19,6 +19,7 @@ import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js'
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js'
 import { findChromeExecutable } from '../dist/chrome-launcher.js'
 import { parseMcpPageList } from '../dist/existing-flow.js'
+import { parseNpmPackJson } from './pack-output.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const withBrowser = process.argv.includes('--browser')
@@ -127,8 +128,11 @@ function productionPaths(lock) {
 }
 
 function stagePackage() {
-  const [packed] = JSON.parse(
-    command('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', work])
+  // npm < 12 emits a bare array; npm 12+ emits an object keyed by package name.
+  // parseNpmPackJson normalizes both and rejects anything else.
+  const packed = parseNpmPackJson(
+    command('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', work]),
+    'npm pack'
   )
   command('tar', ['-xzf', join(work, packed.filename), '-C', work])
   const stage = join(work, 'package')
