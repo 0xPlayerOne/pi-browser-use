@@ -1,161 +1,70 @@
+/**
+ * The native Pi adapter tests run in a subprocess with a synthetic HOME.
+ *
+ * Like the host flow, `dist/index.js` -> `dist/config.js` captures
+ * `DEFAULT_PROFILE_DIR` from `os.homedir()` at import time, and shutdown
+ * releases pages for that directory. The child therefore receives HOME through
+ * its process environment, before its first extension/client/config import,
+ * so shutdown can only touch throwaway temp directories - never a real home
+ * or ~/.pi.
+ *
+ * The child (test/fixtures/pi-adapter-isolated.mjs) owns the original adapter
+ * assertions; this file checks its isolation report and re-reads the
+ * outer-home sentinels independently.
+ */
 import { it } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
-import browserUseExtension, { resolveConfig, configToArgs } from '../dist/index.js'
-import { DevToolsClient } from '../dist/client.js'
+import {
+  assertIsolationReport,
+  createIsolatedHome,
+  runIsolatedHomeTest,
+} from './helpers/isolated-home.mjs'
 
-it('native Pi keeps settings/trust, tool signatures, lifecycle and lazy model credentials', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'browser-pi-adapter-'))
-  const previousHome = process.env.HOME
-  process.env.HOME = dir
-  const handlers = new Map()
-  const registered = new Map()
-  let closed = 0
-  const calls = []
-  t.after(async () => {
-    await handlers.get('session_shutdown')?.({}, { cwd: dir })
-    if (previousHome === undefined) delete process.env.HOME
-    else process.env.HOME = previousHome
-    rmSync(dir, { recursive: true, force: true })
-  })
-  mkdirSync(join(dir, '.pi', 'agent'), { recursive: true })
-  writeFileSync(
-    join(dir, '.pi', 'agent', 'settings.json'),
-    JSON.stringify({
-      // userDataDir keeps the fresh session's identity store off the real
-      // ~/.pi/browser-profile, which a live agent session may hold.
-      'pi-browser-use': {
-        mode: 'fresh',
-        userDataDir: join(dir, 'identity'),
-        visionModel: { provider: 'fixture', model: 'missing' },
-      },
-    })
-  )
-  // Untrusted project settings must not replace safe user settings with a browser attachment.
-  writeFileSync(join(dir, '.pi', 'settings.json'), '{"pi-browser-use":{"mode":"existing"}}')
-  t.mock.method(DevToolsClient.prototype, 'ensureReady', async () => {})
-  t.mock.method(DevToolsClient.prototype, 'listAllTools', async () => [
-    {
-      name: 'list_pages',
-      inputSchema: { type: 'object', properties: {} },
-      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
-    },
-    {
-      name: 'click',
-      inputSchema: { type: 'object', properties: {} },
-      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
-    },
-  ])
-  t.mock.method(DevToolsClient.prototype, 'callTool', async (name, args) => {
-    calls.push({ name, args })
-    return { content: [{ type: 'text', text: 'pages' }] }
-  })
-  t.mock.method(DevToolsClient.prototype, 'close', async () => {
-    closed++
-  })
-  browserUseExtension({
-    registerTool: (tool) => registered.set(tool.name, tool),
-    on: (event, handler) => handlers.set(event, handler),
-  })
-  await handlers.get('session_start')({}, { cwd: dir })
-  const list = registered.get('browser_list_pages')
-  assert.ok(list)
-  const controller = new AbortController()
-  const result = await list.execute('pi-call-id', {}, controller.signal, undefined, {})
-  assert.equal(result.content[0].text, 'pages')
-  assert.ok('details' in result)
-  assert.deepEqual(calls, [{ name: 'list_pages', args: {} }])
-  const status = await registered.get('browser_status').execute('status', {})
-  assert.match(status.content[0].text, /Ephemeral/)
-  const vision = registered.get('browser_analyze_screenshot')
-  assert.ok(vision)
-  await assert.rejects(vision.execute('vision', { pageId: 1 }), /not provided/)
-  assert.equal(typeof configToArgs, 'function')
-  assert.equal(resolveConfig().sessionMode, 'persistent')
-  await handlers.get('session_shutdown')({}, { cwd: dir })
-  assert.equal(closed, 1)
-})
+const childFile = join(import.meta.dirname, 'fixtures', 'pi-adapter-isolated.mjs')
 
-it('native Pi receives tool annotations so host permission gates can act on them', async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'browser-pi-annotations-'))
-  const previousHome = process.env.HOME
-  process.env.HOME = dir
-  const handlers = new Map()
-  const registered = new Map()
-  t.after(async () => {
-    await handlers.get('session_shutdown')?.({}, { cwd: dir })
-    if (previousHome === undefined) delete process.env.HOME
-    else process.env.HOME = previousHome
-    rmSync(dir, { recursive: true, force: true })
-  })
-  mkdirSync(join(dir, '.pi', 'agent'), { recursive: true })
-  writeFileSync(
-    join(dir, '.pi', 'agent', 'settings.json'),
-    JSON.stringify({
-      // userDataDir keeps the fresh session's identity store off the real
-      // ~/.pi/browser-profile, which a live agent session may hold.
-      'pi-browser-use': {
-        mode: 'fresh',
-        userDataDir: join(dir, 'identity'),
-        visionModel: { provider: 'fixture', model: 'missing' },
-      },
-    })
-  )
-  t.mock.method(DevToolsClient.prototype, 'ensureReady', async () => {})
-  t.mock.method(DevToolsClient.prototype, 'listAllTools', async () => [
-    {
-      name: 'list_pages',
-      inputSchema: { type: 'object', properties: {} },
-      annotations: { readOnlyHint: true, openWorldHint: true },
-    },
-    {
-      name: 'close_page',
-      inputSchema: { type: 'object', properties: {} },
-      annotations: { readOnlyHint: false, destructiveHint: true },
-    },
-    // A tool upstream does not annotate must not gain invented hints.
-    { name: 'evaluate_script', inputSchema: { type: 'object', properties: {} } },
-  ])
-  t.mock.method(DevToolsClient.prototype, 'callTool', async () => ({
-    content: [{ type: 'text', text: 'ok' }],
-  }))
-  t.mock.method(DevToolsClient.prototype, 'close', async () => {})
-  browserUseExtension({
-    registerTool: (tool) => registered.set(tool.name, tool),
-    on: (event, handler) => handlers.set(event, handler),
-  })
-  await handlers.get('session_start')({}, { cwd: dir })
-
-  // Upstream annotations are carried through verbatim, not re-declared.
-  assert.deepEqual(registered.get('browser_list_pages').annotations, {
-    readOnlyHint: true,
-    openWorldHint: true,
-  })
-  assert.deepEqual(registered.get('browser_close_page').annotations, {
-    readOnlyHint: false,
-    destructiveHint: true,
-  })
-  assert.equal(registered.get('browser_evaluate_script').annotations, undefined)
-
-  // The plugin's own tools declare the hints their documented behavior implies.
-  assert.deepEqual(registered.get('browser_status').annotations, {
-    readOnlyHint: true,
-    idempotentHint: true,
-    openWorldHint: false,
-  })
-  assert.deepEqual(registered.get('browser_doctor').annotations, {
-    readOnlyHint: true,
-    idempotentHint: true,
-    openWorldHint: false,
-  })
-  assert.deepEqual(registered.get('browser_analyze_screenshot').annotations, {
-    readOnlyHint: true,
-    idempotentHint: true,
-    openWorldHint: false,
-  })
-  // save_artifact writes to a caller-supplied path, so it is not read-only.
-  assert.equal(registered.get('browser_save_artifact').annotations.readOnlyHint, undefined)
-  assert.equal(registered.get('browser_save_artifact').annotations.destructiveHint, true)
+it('keeps the native Pi adapter flow inside a synthetic HOME established before import', () => {
+  const fixture = createIsolatedHome('browser-pi-adapter-')
+  try {
+    const child = runIsolatedHomeTest(childFile, fixture)
+    assert.equal(
+      child.status,
+      0,
+      `isolated adapter child failed (status ${child.status}):\n--- stdout ---\n${child.stdout}\n--- stderr ---\n${child.stderr}`
+    )
+    const report = assertIsolationReport(child.report, fixture)
+    // test 1's upstream tool list also advertises `click`, so the adapter
+    // registers it alongside the plugin's own curated tools.
+    assert.deepEqual(report.registeredTools, [
+      'browser_analyze_screenshot',
+      'browser_click',
+      'browser_doctor',
+      'browser_list_pages',
+      'browser_open_background_tab',
+      'browser_reauth',
+      'browser_save_artifact',
+      'browser_setup',
+      'browser_status',
+      'browser_switch_mode',
+    ])
+    assert.equal(
+      report.visionCredentialLookups,
+      0,
+      'the adapter must not touch vision credentials offline'
+    )
+    // Independent re-read of the outer-home sentinels from this process.
+    assert.equal(
+      readFileSync(fixture.paths.pagesSentinel, 'utf8'),
+      fixture.sentinelText,
+      'the synthetic outer-home page registry sentinel must survive the child unchanged'
+    )
+    assert.equal(
+      readFileSync(fixture.paths.profileSentinel, 'utf8'),
+      fixture.profileSentinelText,
+      'the synthetic default profile sentinel must survive the child unchanged'
+    )
+  } finally {
+    fixture.cleanup()
+  }
 })
