@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { parseNpmPackJson } from './pack-output.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const args = new Set(process.argv.slice(2))
@@ -73,7 +74,9 @@ function measurePackage() {
   if (packed.status !== 0) {
     throw new Error(`npm pack probe failed: ${packed.stderr.trim() || `exit ${packed.status}`}`)
   }
-  const [artifact] = JSON.parse(packed.stdout)
+  // npm < 12 emits a bare array; npm 12+ emits an object keyed by package name.
+  // parseNpmPackJson normalizes both and rejects anything else.
+  const artifact = parseNpmPackJson(packed.stdout, 'npm pack --dry-run')
   const productionDependencyCount = countProductionDependencies(root)
   return {
     packedBytes: artifact.size,
