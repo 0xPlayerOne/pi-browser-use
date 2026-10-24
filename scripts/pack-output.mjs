@@ -9,8 +9,15 @@
  * Both envelopes carry identical per-artifact fields (`name`, `version`,
  * `filename`, `files`, `size`, `unpackedSize`, `entryCount`, ...), so we
  * normalize to the inner artifact and validate it strictly. Anything else -
- * an empty array, multiple packages, a bare scalar, or an artifact missing the
- * metadata the callers measure - is rejected rather than silently coerced.
+ * an empty array, multiple packages, a bare scalar, an artifact missing the
+ * metadata the callers measure, or a non-numeric measurement - is rejected
+ * rather than silently coerced.
+ *
+ * The numeric metrics are validated because `scripts/performance.mjs` compares
+ * them directly against the performance budgets: a missing or malformed
+ * `size`/`unpackedSize`/`entryCount` would otherwise reach
+ * `findBudgetFailures` as `undefined > budget`, which is false and would let a
+ * broken pack report pass the budget check.
  *
  * This is the one implementation shared by the performance audit and the
  * plugin smoke stage, so both stay in lockstep across npm output changes.
@@ -62,5 +69,27 @@ export function parseNpmPackJson(stdout, label = 'npm pack') {
       throw new Error(`${label} artifact.files entries must carry a non-empty string path`)
     }
   }
+  // Fail closed on the measurements the callers compare against budgets:
+  // `size` -> packedBytes, `unpackedSize` -> unpackedBytes, `entryCount` ->
+  // fileCount. Missing, non-finite, negative, or wrong-typed values must not
+  // reach a budget comparison.
+  for (const field of ['size', 'unpackedSize', 'entryCount']) {
+    const value = artifact[field]
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      throw new Error(
+        `${label} artifact.${field} must be a finite non-negative number, got ${describeValue(value)}`
+      )
+    }
+  }
   return artifact
+}
+
+/** Render an invalid metric value in error messages without hiding its shape. */
+function describeValue(value) {
+  if (typeof value === 'number') return String(value) // keeps NaN/Infinity visible
+  if (typeof value === 'string') return JSON.stringify(value)
+  if (value === undefined || value === null) return String(value)
+  if (Array.isArray(value)) return 'an array'
+  if (typeof value === 'object') return 'an object'
+  return String(value)
 }

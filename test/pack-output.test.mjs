@@ -150,3 +150,92 @@ describe('parseNpmPackJson', () => {
     )
   })
 })
+
+/**
+ * `scripts/performance.mjs` reads `size`/`unpackedSize`/`entryCount` straight
+ * from the artifact and compares them to the performance budgets, where a
+ * missing value evaluates as `undefined > budget` (false) and silently passes.
+ * Every metric therefore has to be a finite non-negative number at parse time.
+ */
+const metricFields = ['size', 'unpackedSize', 'entryCount']
+
+function artifactJson(mutate) {
+  const copy = { ...artifact }
+  mutate(copy)
+  return JSON.stringify([copy])
+}
+
+describe('parseNpmPackJson pack metrics', () => {
+  it('accepts finite non-negative metrics, including zero', () => {
+    for (const field of metricFields) {
+      const parsed = parseNpmPackJson(
+        artifactJson((copy) => {
+          copy[field] = 0
+        }),
+        'npm pack'
+      )
+      assert.equal(parsed[field], 0)
+      assert.equal(parseNpmPackJson(legacyJson, 'npm pack')[field], artifact[field])
+    }
+  })
+
+  it('rejects a missing metric', () => {
+    for (const field of metricFields) {
+      assert.throws(
+        () =>
+          parseNpmPackJson(
+            artifactJson((copy) => {
+              delete copy[field]
+            }),
+            'npm pack'
+          ),
+        new RegExp(`artifact\\.${field} must be a finite non-negative number`),
+        `missing ${field} must fail closed`
+      )
+    }
+  })
+
+  it('rejects negative and wrong-typed metrics', () => {
+    const invalidValues = [-1, -0.001, '66436', true, null, {}, []]
+    for (const field of metricFields) {
+      for (const value of invalidValues) {
+        assert.throws(
+          () =>
+            parseNpmPackJson(
+              artifactJson((copy) => {
+                copy[field] = value
+              }),
+              'npm pack'
+            ),
+          new RegExp(`artifact\\.${field} must be a finite non-negative number`),
+          `${field}=${JSON.stringify(value)} must fail closed`
+        )
+      }
+    }
+  })
+
+  it('rejects a non-finite metric, the one malformed number JSON can carry', () => {
+    // JSON has no NaN literal, but `1e999` parses to Infinity and would
+    // otherwise compare as a huge (passing) budget value.
+    for (const field of metricFields) {
+      const json = JSON.stringify([artifact]).replace(
+        `"${field}":${artifact[field]}`,
+        `"${field}":1e999`
+      )
+      assert.notEqual(json, JSON.stringify([artifact]), `fixture must target ${field}`)
+      assert.throws(
+        () => parseNpmPackJson(json, 'npm pack'),
+        new RegExp(`artifact\\.${field} must be a finite non-negative number`),
+        `Infinity ${field} must fail closed`
+      )
+    }
+  })
+
+  it('applies the metric checks to both npm pack envelopes', () => {
+    const broken = { 'pi-browser-use': { ...artifact, entryCount: '68' } }
+    assert.throws(
+      () => parseNpmPackJson(JSON.stringify(broken), 'npm pack'),
+      /artifact\.entryCount must be a finite non-negative number/
+    )
+  })
+})
